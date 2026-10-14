@@ -189,21 +189,40 @@ function TenantListItem({ tenant, selected, onClick }: {
 }) {
   const attention = ['low', 'critical', 'exhausted', 'negative'].includes(tenant.creditStatus);
   return (
-    <button onClick={onClick}
-      className={`w-full px-4 py-3.5 text-left transition-colors hover:bg-[#F9FAFB] ${selected ? 'bg-[#EBF3FF] border-r-2 border-[#1565F0]' : ''}`}>
-      <div className="flex items-center justify-between gap-2 mb-1.5">
-        <p className={`text-sm font-semibold truncate ${selected ? 'text-[#1565F0]' : 'text-[#111827]'}`}>
-          {tenant.name}
-        </p>
-        <CreditStatusBadge status={tenant.creditStatus} />
-      </div>
-      <div className="flex items-center justify-between">
-        <p className="text-[11px] text-[#9CA3AF] truncate">{tenant.plan ?? 'No plan'}</p>
-        <span className={`text-xs font-semibold tabular-nums shrink-0 ml-2 ${tenant.balance < 0 ? 'text-red-600' : attention ? 'text-amber-600' : 'text-[#374151]'}`}>
-          {tenant.balance.toLocaleString()} cr
-        </span>
-      </div>
-    </button>
+    <div className="relative">
+      {/* Left accent — sits inside the wrapper, never overflows */}
+      {selected && (
+        <span className="pointer-events-none absolute left-0 top-1 bottom-1 w-[3px] rounded-full bg-[#1565F0]" />
+      )}
+      <button
+        onClick={onClick}
+        className={[
+          'w-full rounded-lg px-4 py-3 text-left transition-colors',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1565F0] focus-visible:ring-offset-1',
+          selected ? 'bg-[#EBF3FF]' : 'hover:bg-[#F3F4F6]',
+        ].join(' ')}
+      >
+        {/* Row 1 — name + badge */}
+        <div className="flex items-center justify-between gap-2">
+          <p className={`min-w-0 truncate text-sm font-semibold ${selected ? 'text-[#1254C7]' : 'text-[#111827]'}`}>
+            {tenant.name}
+          </p>
+          <CreditStatusBadge status={tenant.creditStatus} />
+        </div>
+        {/* Row 2 — plan + balance */}
+        <div className="mt-1 flex items-center justify-between gap-2">
+          <p className="min-w-0 truncate text-[11px] text-[#9CA3AF]">
+            {tenant.plan?.split(' ')[0] ?? 'No plan'}
+          </p>
+          <span className={[
+            'shrink-0 text-xs font-semibold tabular-nums',
+            tenant.balance < 0 ? 'text-red-600' : attention ? 'text-amber-600' : 'text-[#374151]',
+          ].join(' ')}>
+            {tenant.balance.toLocaleString()} cr
+          </span>
+        </div>
+      </button>
+    </div>
   );
 }
 
@@ -240,7 +259,7 @@ export default function CreditMonitoringPage() {
           <div className="border-b border-gray-100 p-3">
             <SearchBar value={search} onChange={setSearch} placeholder="Find tenant…" />
           </div>
-          <div className="flex-1 overflow-y-auto divide-y divide-[#F3F4F6]">
+          <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
             {filteredTenants.length === 0 && (
               <p className="px-4 py-8 text-center text-sm text-[#9CA3AF]">No tenants found</p>
             )}
