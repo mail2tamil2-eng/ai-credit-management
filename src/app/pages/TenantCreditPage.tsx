@@ -232,7 +232,7 @@ export default function TenantCreditPage() {
           value={search}
           onChange={v => { setSearch(v); setPage(1); }}
           placeholder="Search tenants…"
-          className="w-52"
+          className="w-52 [&_input]:!h-9 [&_input]:!rounded-lg [&_input]:!border-gray-200 [&_input:hover]:!border-gray-300"
         />
 
         <div className="h-5 w-px bg-gray-200 shrink-0" />
