@@ -187,37 +187,51 @@ function TenantListItem({ tenant, selected, onClick }: {
   selected: boolean;
   onClick: () => void;
 }) {
-  const attention = ['low', 'critical', 'exhausted', 'negative'].includes(tenant.creditStatus);
+  // Red only for a genuine financial exception (balance below zero).
+  // All other credit-health states are already communicated by the badge;
+  // coloring the balance amber/orange on top adds visual noise without
+  // new information and fails WCAG AA (amber-600 on white = 3.0:1).
+  const balanceColor =
+    tenant.balance < 0  ? 'text-red-600'     // negative: financial exception
+    : tenant.balance === 0 ? 'text-[#4B5563]' // exhausted: muted, badge carries the meaning
+    : 'text-[#374151]';                        // positive: dark neutral
+
   return (
     <div className="relative">
-      {/* Left accent — sits inside the wrapper, never overflows */}
+      {/* Left accent — contained inside wrapper, never overflows */}
       {selected && (
-        <span className="pointer-events-none absolute left-0 top-1 bottom-1 w-[3px] rounded-full bg-[#1565F0]" />
+        <span aria-hidden className="pointer-events-none absolute left-0 top-1 bottom-1 w-[3px] rounded-full bg-[#1565F0]" />
       )}
       <button
         onClick={onClick}
+        aria-pressed={selected}
         className={[
           'w-full rounded-lg px-4 py-3 text-left transition-colors',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1565F0] focus-visible:ring-offset-1',
           selected ? 'bg-[#EBF3FF]' : 'hover:bg-[#F3F4F6]',
         ].join(' ')}
       >
-        {/* Row 1 — name + badge */}
+        {/* Row 1 — name + status badge */}
         <div className="flex items-center justify-between gap-2">
-          <p className={`min-w-0 truncate text-sm font-semibold ${selected ? 'text-[#1254C7]' : 'text-[#111827]'}`}>
+          {/* Name stays dark regardless of selection — blue-on-EBF3FF fails WCAG AA (4.2:1) */}
+          <p className="min-w-0 truncate text-sm font-semibold text-[#111827]">
             {tenant.name}
           </p>
           <CreditStatusBadge status={tenant.creditStatus} />
         </div>
-        {/* Row 2 — plan + balance */}
+        {/* Row 2 — plan name + balance + suspended chip */}
         <div className="mt-1 flex items-center justify-between gap-2">
-          <p className="min-w-0 truncate text-[11px] text-[#9CA3AF]">
-            {tenant.plan?.split(' ')[0] ?? 'No plan'}
-          </p>
-          <span className={[
-            'shrink-0 text-xs font-semibold tabular-nums',
-            tenant.balance < 0 ? 'text-red-600' : attention ? 'text-amber-600' : 'text-[#374151]',
-          ].join(' ')}>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <p className="min-w-0 truncate text-[11px] text-[#9CA3AF]">
+              {tenant.plan?.split(' ')[0] ?? 'No plan'}
+            </p>
+            {tenant.tenantStatus === 'suspended' && (
+              <span className="shrink-0 rounded px-1 py-0.5 text-[10px] font-semibold bg-gray-100 text-[#374151]">
+                Suspended
+              </span>
+            )}
+          </div>
+          <span className={`shrink-0 text-xs font-semibold tabular-nums ${balanceColor}`}>
             {tenant.balance.toLocaleString()} cr
           </span>
         </div>
