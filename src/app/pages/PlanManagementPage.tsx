@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Plus, BookOpen, Users, CheckCircle2, ArchiveX, Pencil, Trash2, PowerOff, Power, MoreHorizontal } from 'lucide-react';
+import { Plus, BookOpen, Users, CheckCircle2, ArchiveX, Pencil, Trash2, PowerOff, Power, MoreHorizontal, X } from 'lucide-react';
 import {
   Button, DataTable, Pagination, Modal, FormField, TextInput, TextArea, SelectInput,
-  PageHeader, StatWidget, SearchBar, Chip, DropdownMenu, IconButton,
+  PageHeader, StatWidget, SearchBar, DropdownMenu, IconButton,
 } from '../components/saas';
 import type { Plan, PlanInterval } from './creditTypes';
 import { MOCK_PLANS } from './creditTypes';
@@ -166,6 +166,7 @@ export default function PlanManagementPage() {
   });
 
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const hasFilters = statusFilter !== 'all' || search.trim() !== '';
 
   function handleCreate(saved?: Plan) {
     if (saved) setPlans(p => [saved, ...p]);
@@ -216,27 +217,53 @@ export default function PlanManagementPage() {
           hint={inactivePlans.length > 0 ? 'Consider removing' : 'None'} />
       </div>
 
-      {/* Filter row */}
-      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm">
-        <SearchBar value={search} onChange={v => { setSearch(v); setPage(1); }}
-          placeholder="Search plans…" className="w-52" />
-        <div className="h-5 w-px bg-gray-200" />
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Status</span>
-          <div className="flex gap-1">
-            {(['all', 'active', 'inactive'] as const).map(s => (
-              <Chip key={s} selected={statusFilter === s}
-                onClick={() => { setStatusFilter(s); setPage(1); }}>
-                {s === 'all' ? 'All' : s === 'active' ? 'Active' : 'Inactive'}
-              </Chip>
-            ))}
-          </div>
+      {/* Filter toolbar */}
+      <div className="flex flex-wrap items-center gap-2.5 rounded-xl border border-gray-200 bg-white px-4 py-2.5">
+
+        {/* Search */}
+        <SearchBar
+          value={search}
+          onChange={v => { setSearch(v); setPage(1); }}
+          placeholder="Search plans…"
+          className="w-52 [&_input]:!h-9 [&_input]:!rounded-lg [&_input]:!border-gray-200 [&_input:hover]:!border-gray-300"
+        />
+
+        <div className="h-5 w-px bg-gray-200 shrink-0" />
+
+        {/* Status — segmented control */}
+        <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+          {(['all', 'active', 'inactive'] as const).map(s => (
+            <button
+              key={s}
+              onClick={() => { setStatusFilter(s); setPage(1); }}
+              className={[
+                'rounded-md px-3 py-1.5 text-xs font-medium capitalize transition-all',
+                statusFilter === s
+                  ? 'bg-white text-[#111827] shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700',
+              ].join(' ')}
+            >
+              {s === 'all' ? 'All' : s === 'active' ? 'Active' : 'Inactive'}
+            </button>
+          ))}
         </div>
-        {filtered.length !== plans.length && (
-          <span className="ml-auto text-xs text-gray-400">
-            Showing {filtered.length} of {plans.length} plans
+
+        {/* Right — result count + clear */}
+        <div className="ml-auto flex items-center gap-3">
+          {hasFilters && (
+            <button
+              onClick={() => { setStatusFilter('all'); setSearch(''); setPage(1); }}
+              className="flex items-center gap-1 text-xs text-gray-400 transition-colors hover:text-gray-600"
+            >
+              <X className="size-3" />
+              Clear all
+            </button>
+          )}
+          <span className="text-xs text-gray-400 tabular-nums">
+            {filtered.length} of {plans.length} plans
           </span>
-        )}
+        </div>
+
       </div>
 
       {/* Table */}
