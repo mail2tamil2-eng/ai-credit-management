@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Download, RotateCcw, AlertTriangle, Users, ShieldOff, Activity, MoreHorizontal } from 'lucide-react';
+import { Download, AlertTriangle, Users, ShieldOff, Activity, MoreHorizontal, ChevronDown, X } from 'lucide-react';
 import {
-  Button, DataTable, Pagination, Modal, FormField, SearchBar, Chip,
+  Button, DataTable, Pagination, Modal, FormField, SearchBar,
   Tooltip, PageHeader, StatWidget, DropdownMenu, IconButton,
 } from '../components/saas';
 import { CreditStatusBadge } from '../components/CreditStatusBadge';
@@ -224,60 +224,107 @@ export default function TenantCreditPage() {
         <StatWidget label="Suspended" value={suspendedCount} icon={ShieldOff} tone="orange" />
       </div>
 
-      {/* Filter panel */}
-      <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm space-y-3">
-        {/* Row 1 — search + account status + quick filters */}
-        <div className="flex flex-wrap items-center gap-3">
-          <SearchBar value={search} onChange={v => { setSearch(v); setPage(1); }} placeholder="Search tenant…" className="w-56" />
+      {/* ── Filter toolbar ── */}
+      <div className="flex flex-wrap items-center gap-2.5 rounded-xl border border-gray-200 bg-white px-4 py-2.5">
 
-          <div className="h-5 w-px bg-gray-200" />
+        {/* 1. Search */}
+        <SearchBar
+          value={search}
+          onChange={v => { setSearch(v); setPage(1); }}
+          placeholder="Search tenants…"
+          className="w-52"
+        />
 
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Account</span>
-            <div className="flex gap-1">
-              {(['all', 'active', 'suspended'] as const).map(s => (
-                <Chip key={s} selected={tenantStatusFilter === s}
-                  onClick={() => { setTenantStatusFilter(s); setPage(1); }}>
-                  {s === 'all' ? 'All' : s === 'active' ? 'Active' : 'Suspended'}
-                </Chip>
-              ))}
-            </div>
-          </div>
+        <div className="h-5 w-px bg-gray-200 shrink-0" />
 
-          <div className="ml-auto flex items-center gap-2">
-            <Chip
-              selected={needsAttention}
-              onClick={() => { setNeedsAttention(n => !n); setPage(1); }}
-              icon={<AlertTriangle className="size-3" />}
-              className={needsAttention ? '!bg-orange-50 !text-orange-700 !ring-orange-300' : ''}>
-              Needs Attention {needsCount > 0 && <span className="ml-0.5 rounded-full bg-orange-400 px-1.5 py-0.5 text-[10px] font-bold text-white">{needsCount}</span>}
-            </Chip>
-            {hasFilters && (
-              <button
-                onClick={() => { setStatusFilter([]); setNeedsAttention(false); setTenantStatusFilter('active'); setPage(1); }}
-                className="flex items-center gap-1 rounded-full px-2.5 py-1 text-xs text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
-                <RotateCcw className="size-3" /> Reset
-              </button>
-            )}
-          </div>
+        {/* 2. Account status — segmented control */}
+        <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+          {(['all', 'active', 'suspended'] as const).map(s => (
+            <button
+              key={s}
+              onClick={() => { setTenantStatusFilter(s); setPage(1); }}
+              className={[
+                'rounded-md px-3 py-1.5 text-xs font-medium capitalize transition-all',
+                tenantStatusFilter === s
+                  ? 'bg-white text-[#111827] shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700',
+              ].join(' ')}
+            >
+              {s === 'all' ? 'All' : s}
+            </button>
+          ))}
         </div>
 
-        {/* Row 2 — credit status chips */}
-        <div className="flex items-center gap-2.5">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Credit Status</span>
-          <div className="flex gap-1.5">
-            {ALL_STATUSES.map(s => (
-              <Chip key={s} selected={statusFilter.includes(s)} onClick={() => toggleStatus(s)}>
-                {STATUS_LABELS[s]}
-              </Chip>
-            ))}
-          </div>
-          {filtered.length !== tenants.length && (
-            <span className="ml-auto text-xs text-gray-400">
-              Showing {filtered.length} of {tenants.length} tenants
+        <div className="h-5 w-px bg-gray-200 shrink-0" />
+
+        {/* 3. Credit Health — dropdown (multi-select) */}
+        <DropdownMenu
+          align="start"
+          trigger={
+            <button className={[
+              'flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors',
+              statusFilter.length > 0
+                ? 'border-[#1565F0] bg-[#EBF3FF] text-[#1254C7]'
+                : 'border-gray-200 bg-white text-[#374151] hover:border-gray-300 hover:bg-gray-50',
+            ].join(' ')}>
+              <span>Credit Health</span>
+              {statusFilter.length > 0 && (
+                <span className="flex size-4 items-center justify-center rounded-full bg-[#1565F0] text-[10px] font-bold text-white">
+                  {statusFilter.length}
+                </span>
+              )}
+              <ChevronDown className="size-3.5 text-gray-400" />
+            </button>
+          }
+          items={ALL_STATUSES.map(s => ({
+            type: 'checkbox' as const,
+            label: STATUS_LABELS[s],
+            checked: statusFilter.includes(s),
+            onCheckedChange: (v: boolean) => {
+              setStatusFilter(prev => v ? [...prev, s] : prev.filter(x => x !== s));
+              setPage(1);
+            },
+          }))}
+        />
+
+        {/* 4. Needs Attention — toggle */}
+        <button
+          onClick={() => { setNeedsAttention(n => !n); setPage(1); }}
+          className={[
+            'flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors',
+            needsAttention
+              ? 'border-orange-300 bg-orange-50 text-orange-700'
+              : 'border-gray-200 bg-white text-[#374151] hover:border-orange-200 hover:text-orange-600',
+          ].join(' ')}
+        >
+          <AlertTriangle className="size-3.5" />
+          <span>Needs Attention</span>
+          {needsCount > 0 && (
+            <span className={[
+              'rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums',
+              needsAttention ? 'bg-orange-500 text-white' : 'bg-orange-100 text-orange-600',
+            ].join(' ')}>
+              {needsCount}
             </span>
           )}
+        </button>
+
+        {/* 5. Right — result count + clear */}
+        <div className="ml-auto flex items-center gap-3">
+          {hasFilters && (
+            <button
+              onClick={() => { setStatusFilter([]); setNeedsAttention(false); setTenantStatusFilter('active'); setPage(1); }}
+              className="flex items-center gap-1 text-xs text-gray-400 transition-colors hover:text-gray-600"
+            >
+              <X className="size-3" />
+              Clear all
+            </button>
+          )}
+          <span className="text-xs text-gray-400 tabular-nums">
+            {filtered.length} of {tenants.length} tenants
+          </span>
         </div>
+
       </div>
 
       {/* Table */}
