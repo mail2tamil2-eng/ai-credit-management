@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { TrendingUp, Zap, Layers, Users, AlertTriangle, CheckCircle2, ShieldOff, ArrowLeft } from 'lucide-react';
-import { Button, StatWidget, PageHeader, SearchBar } from '../components/saas';
+import { Button, StatWidget, PageHeader } from '../components/saas';
 import { CreditStatusBadge } from '../components/CreditStatusBadge';
 import type { TenantCredit, CreditStatus } from './creditTypes';
 import { MOCK_TENANTS, MOCK_TRANSACTIONS } from './creditTypes';
@@ -181,33 +181,55 @@ function InfoRow({ label, value, valueClass }: { label: string; value: string; v
   );
 }
 
-// ── Tenant list item ──────────────────────────────────────────────────────────
-function TenantListItem({ tenant, selected, onClick }: {
+// ── Tenant selector card ──────────────────────────────────────────────────────
+function TenantCard({ tenant, selected, onClick }: {
   tenant: TenantCredit;
   selected: boolean;
   onClick: () => void;
 }) {
-  const attention = ['low', 'critical', 'exhausted', 'negative'].includes(tenant.creditStatus);
+  const max = PLAN_MAX[tenant.plan?.split(' ')[0] ?? ''] ?? 5000;
+  const pct = Math.max(0, Math.min(100, max > 0 ? (tenant.balance / max) * 100 : 0));
+  const color = GAUGE_COLORS[tenant.creditStatus];
+
   return (
-    <button onClick={onClick}
-      className={`w-full px-4 py-3 text-left transition-colors hover:bg-[#F9FAFB] ${selected ? 'bg-[#EBF3FF] border-r-2 border-[#1565F0]' : ''}`}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className={`text-sm font-semibold truncate ${selected ? 'text-[#1565F0]' : 'text-[#111827]'}`}>
-            {tenant.name}
-          </p>
-          <p className="text-[11px] text-[#9CA3AF] mt-0.5 truncate">{tenant.plan ?? 'No plan'}</p>
-        </div>
-        <CreditStatusBadge status={tenant.creditStatus} />
+    <button
+      onClick={onClick}
+      className={`relative flex w-48 shrink-0 flex-col gap-2 rounded-2xl border-2 p-4 text-left transition-all
+        ${selected
+          ? 'border-[#1565F0] bg-[#EBF3FF] shadow-md'
+          : 'border-gray-100 bg-white hover:border-gray-300 hover:shadow-sm'}`}
+    >
+      {/* Status dot top-right */}
+      <span className="absolute right-3 top-3 size-2.5 rounded-full"
+        style={{ background: color }} aria-hidden />
+
+      <div className="pr-4">
+        <p className={`text-sm font-bold leading-tight truncate ${selected ? 'text-[#1254C7]' : 'text-[#111827]'}`}>
+          {tenant.name}
+        </p>
+        <p className="mt-0.5 truncate text-[11px] text-[#9CA3AF]">
+          {tenant.plan?.split(' ')[0] ?? 'No plan'}
+        </p>
       </div>
-      <div className="mt-1.5 flex items-center justify-between">
-        <span className={`text-xs font-semibold tabular-nums ${tenant.balance < 0 ? 'text-red-600' : attention ? 'text-amber-600' : 'text-[#374151]'}`}>
-          {tenant.balance.toLocaleString()} cr
+
+      <p className={`text-xl font-extrabold tabular-nums leading-none ${tenant.balance < 0 ? 'text-red-600' : selected ? 'text-[#1254C7]' : 'text-[#111827]'}`}>
+        {tenant.balance.toLocaleString()}
+        <span className="ml-1 text-xs font-normal text-[#9CA3AF]">cr</span>
+      </p>
+
+      {/* Mini progress bar */}
+      <div className="h-1.5 w-full rounded-full bg-[#E5E7EB]">
+        <div className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${pct}%`, background: color }} />
+      </div>
+
+      <CreditStatusBadge status={tenant.creditStatus} />
+
+      {tenant.tenantStatus === 'suspended' && (
+        <span className="absolute bottom-3 right-3 text-[10px] font-semibold text-gray-400">
+          Suspended
         </span>
-        {tenant.tenantStatus === 'suspended' && (
-          <span className="text-[10px] text-gray-400 font-medium">Suspended</span>
-        )}
-      </div>
+      )}
     </button>
   );
 }
@@ -215,63 +237,56 @@ function TenantListItem({ tenant, selected, onClick }: {
 // ── Full Page ─────────────────────────────────────────────────────────────────
 export default function CreditMonitoringPage() {
   const [selected, setSelected] = useState<TenantCredit>(MOCK_TENANTS[0]);
-  const [search, setSearch] = useState('');
 
-  const healthy = MOCK_TENANTS.filter(t => t.creditStatus === 'active').length;
-  const atRisk = MOCK_TENANTS.filter(t => ['low', 'critical', 'exhausted', 'negative'].includes(t.creditStatus)).length;
+  const healthy  = MOCK_TENANTS.filter(t => t.creditStatus === 'active').length;
+  const atRisk   = MOCK_TENANTS.filter(t => ['low', 'critical', 'exhausted', 'negative'].includes(t.creditStatus)).length;
   const suspended = MOCK_TENANTS.filter(t => t.tenantStatus === 'suspended').length;
 
-  const filteredTenants = MOCK_TENANTS.filter(t =>
-    !search || t.name.toLowerCase().includes(search.toLowerCase())
-  );
+  // Sort: needs-attention first, healthy next, suspended last
+  const sorted = [...MOCK_TENANTS].sort((a, b) => {
+    const rank = (t: TenantCredit) =>
+      t.tenantStatus === 'suspended' ? 2 : t.creditStatus === 'active' ? 1 : 0;
+    return rank(a) - rank(b);
+  });
 
   return (
-    <div className="flex h-full flex-col gap-6 px-8 py-6">
+    <div className="px-8 py-6 space-y-6">
       <PageHeader title="Credit Monitoring" />
 
       {/* System-wide KPIs */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatWidget label="Total Tenants" value={MOCK_TENANTS.length} icon={Users} tone="blue" />
-        <StatWidget label="Healthy" value={healthy} icon={CheckCircle2} tone="green" hint="Credits above threshold" />
-        <StatWidget label="Needs Attention" value={atRisk} icon={AlertTriangle} tone="amber"
-          hint={atRisk > 0 ? 'Low, critical or exhausted' : 'None'} />
-        <StatWidget label="Suspended" value={suspended} icon={ShieldOff} tone="orange" />
+        <StatWidget label="Total Tenants"    value={MOCK_TENANTS.length} icon={Users}        tone="blue" />
+        <StatWidget label="Healthy"          value={healthy}             icon={CheckCircle2} tone="green"  hint="Credits above threshold" />
+        <StatWidget label="Needs Attention"  value={atRisk}              icon={AlertTriangle} tone="amber" hint={atRisk > 0 ? 'Low, critical or exhausted' : 'None'} />
+        <StatWidget label="Suspended"        value={suspended}           icon={ShieldOff}    tone="orange" />
       </div>
 
-      {/* Two-column layout */}
-      <div className="flex min-h-0 flex-1 gap-5">
-
-        {/* Left — tenant list */}
-        <div className="flex w-64 shrink-0 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-          <div className="border-b border-gray-100 p-3">
-            <SearchBar value={search} onChange={setSearch} placeholder="Find tenant…" />
-          </div>
-          <div className="flex-1 overflow-y-auto divide-y divide-[#F9FAFB]">
-            {filteredTenants.length === 0 && (
-              <p className="px-4 py-8 text-center text-sm text-[#9CA3AF]">No tenants found</p>
-            )}
-            {filteredTenants.map(t => (
-              <TenantListItem key={t.id} tenant={t}
-                selected={selected.id === t.id}
-                onClick={() => setSelected(t)} />
-            ))}
-          </div>
+      {/* Tenant selector — horizontal scroll */}
+      <div>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[#9CA3AF]">
+          Select Tenant
+        </p>
+        <div className="flex gap-3 overflow-x-auto pb-2">
+          {sorted.map(t => (
+            <TenantCard key={t.id} tenant={t}
+              selected={selected.id === t.id}
+              onClick={() => setSelected(t)} />
+          ))}
         </div>
+      </div>
 
-        {/* Right — detail panel */}
-        <div className="flex-1 overflow-y-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
-          <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-4">
-            <div>
-              <h2 className="text-base font-bold text-[#111827]">{selected.name}</h2>
-              <p className="text-xs text-[#9CA3AF]">{selected.plan ?? 'No plan assigned'}</p>
-            </div>
-            <CreditStatusBadge status={selected.creditStatus} />
+      {/* Detail panel — full width */}
+      <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+          <div>
+            <h2 className="text-base font-bold text-[#111827]">{selected.name}</h2>
+            <p className="text-xs text-[#9CA3AF]">{selected.plan ?? 'No plan assigned'}</p>
           </div>
-          <div className="p-6">
-            <CreditMonitoringContent key={selected.id} tenant={selected} />
-          </div>
+          <CreditStatusBadge status={selected.creditStatus} />
         </div>
-
+        <div className="p-6">
+          <CreditMonitoringContent key={selected.id} tenant={selected} />
+        </div>
       </div>
     </div>
   );
