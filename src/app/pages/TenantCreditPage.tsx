@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Download, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Download, RotateCcw, AlertTriangle, Users, ShieldOff, Activity, MoreHorizontal } from 'lucide-react';
 import {
-  Button, DataTable, Pagination, Modal, FormField, SearchBar, Tooltip, PageHeader,
+  Button, DataTable, Pagination, Modal, FormField, SearchBar, Chip,
+  Tooltip, PageHeader, StatWidget, DropdownMenu, IconButton,
 } from '../components/saas';
 import { CreditStatusBadge } from '../components/CreditStatusBadge';
 import type { TenantCredit, CreditStatus, Plan } from './creditTypes';
@@ -15,28 +16,27 @@ function ChangePlanModal({ tenant, onClose }: { tenant: TenantCredit; onClose: (
   const [selected, setSelected] = useState<Plan | null>(null);
   const [confirmed, setConfirmed] = useState(false);
 
-  const isUpgrade = selected && tenant.balance > 0;
-  const creditsImpact = selected
-    ? (isUpgrade ? selected.credits - (MOCK_PLANS.find(p => tenant.plan?.startsWith(p.name))?.credits ?? 0) : 0)
-    : 0;
+  const currentPlan = MOCK_PLANS.find(p => tenant.plan?.startsWith(p.name));
+  const creditsImpact = selected ? Math.max(0, selected.credits - (currentPlan?.credits ?? 0)) : 0;
 
   if (confirmed && selected) {
     return (
-      <Modal open onOpenChange={(v) => { if (!v) onClose(); }} title="Confirm Plan Change"
+      <Modal open onOpenChange={(v) => { if (!v) onClose(); }} title="Confirm Plan Change" size="sm"
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setConfirmed(false)}>Back</Button>
-            <Button onClick={onClose}>Confirm</Button>
+            <Button onClick={onClose}>Confirm Change</Button>
           </div>
         }>
-        <div className="rounded-xl bg-[#F9FAFB] p-4 text-sm space-y-2">
-          <div className="flex justify-between"><span className="text-[#6B7280]">Tenant</span><span className="font-medium">{tenant.name}</span></div>
-          <div className="flex justify-between"><span className="text-[#6B7280]">Current Plan</span><span>{tenant.plan ?? '—'}</span></div>
-          <div className="flex justify-between"><span className="text-[#6B7280]">New Plan</span><span className="font-semibold text-[#1565F0]">{selected.name} ({selected.interval})</span></div>
-          {creditsImpact > 0 && (
-            <div className="flex justify-between"><span className="text-[#6B7280]">Credits Added Now</span><span className="font-semibold text-green-700">+{creditsImpact.toLocaleString()}</span></div>
-          )}
-          <div className="flex justify-between"><span className="text-[#6B7280]">Balance After</span><span className="font-semibold">{(tenant.balance + creditsImpact).toLocaleString()}</span></div>
+        <div className="space-y-3 text-sm">
+          <div className="rounded-xl bg-[#F9FAFB] p-4 space-y-2.5">
+            <Row label="Tenant" value={tenant.name} bold />
+            <Row label="Current Plan" value={tenant.plan ?? '—'} />
+            <Row label="New Plan" value={`${selected.name} (${selected.interval})`} blue />
+            {creditsImpact > 0 && <Row label="Credits Added Now" value={`+${creditsImpact.toLocaleString()}`} green />}
+            <div className="h-px bg-[#E5E7EB]" />
+            <Row label="Balance After" value={(tenant.balance + creditsImpact).toLocaleString()} bold />
+          </div>
         </div>
       </Modal>
     );
@@ -51,10 +51,10 @@ function ChangePlanModal({ tenant, onClose }: { tenant: TenantCredit; onClose: (
         </div>
       }>
       <div className="space-y-4">
-        <div className="rounded-xl bg-[#EBF3FF] p-3 text-sm">
-          <span className="text-[#6B7280]">Tenant: </span>
+        <div className="rounded-xl bg-[#EBF3FF] px-4 py-3 text-sm flex items-center justify-between">
+          <span className="text-[#6B7280]">Tenant</span>
           <span className="font-semibold text-[#111827]">{tenant.name}</span>
-          {tenant.plan && <><span className="mx-2 text-[#D1D5DB]">|</span><span className="text-[#6B7280]">Current Plan: </span><span className="font-medium">{tenant.plan}</span></>}
+          {tenant.plan && <span className="text-xs text-[#9CA3AF]">Current: {tenant.plan}</span>}
         </div>
         <FormField label="Select New Plan" required>
           {() => (
@@ -67,7 +67,11 @@ function ChangePlanModal({ tenant, onClose }: { tenant: TenantCredit; onClose: (
                       <p className="font-semibold text-sm text-[#111827]">{p.name}</p>
                       <p className="text-xs text-[#6B7280]">{p.interval} · {p.credits.toLocaleString()} credits</p>
                     </div>
-                    {selected?.id === p.id && <span className="size-4 rounded-full bg-[#1565F0] flex items-center justify-center"><span className="size-2 rounded-full bg-white" /></span>}
+                    {selected?.id === p.id && (
+                      <span className="size-5 rounded-full bg-[#1565F0] flex items-center justify-center">
+                        <span className="size-2 rounded-full bg-white" />
+                      </span>
+                    )}
                   </div>
                 </button>
               ))}
@@ -89,19 +93,22 @@ function TopUpModal({ tenant, onClose }: { tenant: TenantCredit; onClose: () => 
 
   if (confirmed && amount > 0) {
     return (
-      <Modal open onOpenChange={(v) => { if (!v) onClose(); }} title="Confirm Top-up"
+      <Modal open onOpenChange={(v) => { if (!v) onClose(); }} title="Confirm Top-up" size="sm" tone="success"
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setConfirmed(false)}>Back</Button>
             <Button onClick={onClose}>Add Credits</Button>
           </div>
         }>
-        <div className="rounded-xl bg-[#F9FAFB] p-4 text-sm space-y-2">
-          <div className="flex justify-between"><span className="text-[#6B7280]">Tenant</span><span className="font-medium">{tenant.name}</span></div>
-          <div className="flex justify-between"><span className="text-[#6B7280]">Current Balance</span><span>{tenant.balance.toLocaleString()}</span></div>
-          <div className="flex justify-between"><span className="text-[#6B7280]">Top-up Amount</span><span className="font-semibold text-green-700">+{amount.toLocaleString()}</span></div>
-          <div className="h-px bg-[#E5E7EB]" />
-          <div className="flex justify-between"><span className="font-semibold text-[#111827]">Balance After Top-up</span><span className="font-bold text-[#1565F0] text-base">{newBalance.toLocaleString()}</span></div>
+        <div className="space-y-3 text-sm">
+          <div className="rounded-xl bg-[#F9FAFB] p-4 space-y-2.5">
+            <Row label="Tenant" value={tenant.name} bold />
+            <Row label="Current Balance" value={tenant.balance.toLocaleString()} />
+            <Row label="Adding" value={`+${amount.toLocaleString()}`} green />
+            <div className="h-px bg-[#E5E7EB]" />
+            <Row label="New Balance" value={`${newBalance.toLocaleString()} credits`} bold blue />
+          </div>
+          {reference && <p className="text-xs text-[#6B7280]">Ref: {reference}</p>}
         </div>
       </Modal>
     );
@@ -116,11 +123,12 @@ function TopUpModal({ tenant, onClose }: { tenant: TenantCredit; onClose: () => 
         </div>
       }>
       <div className="space-y-4">
-        <div className="rounded-xl bg-[#EBF3FF] p-3 text-sm flex items-center justify-between">
-          <div><span className="text-[#6B7280]">Tenant: </span><span className="font-semibold">{tenant.name}</span></div>
-          <div><span className="text-[#6B7280]">Current Balance: </span><span className="font-semibold text-[#111827]">{tenant.balance.toLocaleString()}</span></div>
+        <div className="rounded-xl bg-[#EBF3FF] px-4 py-3 text-sm flex items-center justify-between">
+          <span className="text-[#6B7280]">Tenant</span>
+          <span className="font-semibold text-[#111827]">{tenant.name}</span>
+          <span className="text-xs text-[#9CA3AF]">Balance: {tenant.balance.toLocaleString()}</span>
         </div>
-        <FormField label="Credits to Add" required hint="Must be a positive number">
+        <FormField label="Credits to Add" required hint="Enter a positive number">
           {({ id }) => (
             <input id={id} type="number" min={1}
               className="w-full rounded-lg border border-[#6B7280] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1565F0]"
@@ -128,9 +136,9 @@ function TopUpModal({ tenant, onClose }: { tenant: TenantCredit; onClose: () => 
           )}
         </FormField>
         {amount > 0 && (
-          <div className="rounded-lg bg-green-50 px-3 py-2 text-sm flex items-center justify-between">
-            <span className="text-green-700">Resulting Balance</span>
-            <span className="font-bold text-green-800 text-base">{newBalance.toLocaleString()} credits</span>
+          <div className="rounded-lg bg-green-50 px-4 py-2.5 flex items-center justify-between text-sm">
+            <span className="text-green-700">Balance after top-up</span>
+            <span className="font-bold text-green-800 text-base">{newBalance.toLocaleString()}</span>
           </div>
         )}
         <FormField label="Reference / Remarks" required hint="For traceability">
@@ -145,12 +153,23 @@ function TopUpModal({ tenant, onClose }: { tenant: TenantCredit; onClose: () => 
   );
 }
 
-// ── Main Page ──────────────────────────────────────────────────────────────────
+// ── Small helper ──────────────────────────────────────────────────────────────
+function Row({ label, value, bold, blue, green }: { label: string; value: string; bold?: boolean; blue?: boolean; green?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-[#6B7280]">{label}</span>
+      <span className={`text-right ${bold ? 'font-semibold text-[#111827]' : ''} ${blue ? 'text-[#1565F0]' : ''} ${green ? 'text-green-700' : ''}`}>{value}</span>
+    </div>
+  );
+}
+
+// ── Credit status labels ───────────────────────────────────────────────────────
 const ALL_STATUSES: CreditStatus[] = ['active', 'low', 'critical', 'exhausted', 'negative'];
 const STATUS_LABELS: Record<CreditStatus, string> = {
-  active: 'Active', low: 'Low', critical: 'Critical', exhausted: 'Exhausted', negative: 'Negative',
+  active: 'Healthy', low: 'Low', critical: 'Critical', exhausted: 'Exhausted', negative: 'Negative',
 };
 
+// ── Main Page ──────────────────────────────────────────────────────────────────
 export default function TenantCreditPage() {
   const [tenants] = useState<TenantCredit[]>(MOCK_TENANTS);
   const [search, setSearch] = useState('');
@@ -165,6 +184,7 @@ export default function TenantCreditPage() {
   const pageSize = 10;
 
   const attention: CreditStatus[] = ['low', 'critical', 'exhausted', 'negative'];
+
   const filtered = tenants.filter(t => {
     if (search && !t.name.toLowerCase().includes(search.toLowerCase())) return false;
     if (tenantStatusFilter !== 'all' && t.tenantStatus !== tenantStatusFilter) return false;
@@ -174,14 +194,20 @@ export default function TenantCreditPage() {
   });
 
   const needsCount = tenants.filter(t => attention.includes(t.creditStatus)).length;
+  const activeCount = tenants.filter(t => t.tenantStatus === 'active').length;
+  const suspendedCount = tenants.filter(t => t.tenantStatus === 'suspended').length;
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   function toggleStatus(s: CreditStatus) {
     setStatusFilter(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
+    setPage(1);
   }
 
+  const hasFilters = statusFilter.length > 0 || needsAttention || tenantStatusFilter !== 'active';
+
   return (
-    <div className="px-8 py-6">
+    <div className="px-8 py-6 space-y-6">
+      {/* Header */}
       <PageHeader
         title="AI Credit Management"
         actions={
@@ -189,118 +215,176 @@ export default function TenantCreditPage() {
         }
       />
 
-      {/* Summary chips */}
-      <div className="mt-4 flex gap-3">
-        {[
-          { label: 'Total Tenants', value: tenants.length, color: 'text-[#1565F0] bg-[#EBF3FF]' },
-          { label: 'Needs Attention', value: needsCount, color: 'text-red-700 bg-red-50' },
-          { label: 'Suspended', value: tenants.filter(t => t.tenantStatus === 'suspended').length, color: 'text-gray-600 bg-gray-100' },
-        ].map(s => (
-          <div key={s.label} className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium ${s.color}`}>
-            <span className="text-xl font-bold">{s.value}</span>
-            <span>{s.label}</span>
-          </div>
-        ))}
+      {/* KPI cards */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <StatWidget label="Total Tenants" value={tenants.length} icon={Users} tone="blue" />
+        <StatWidget label="Active Accounts" value={activeCount} icon={Activity} tone="green" />
+        <StatWidget label="Needs Attention" value={needsCount} icon={AlertTriangle} tone="amber"
+          hint={needsCount > 0 ? 'Low, critical or exhausted' : 'All credits healthy'} />
+        <StatWidget label="Suspended" value={suspendedCount} icon={ShieldOff} tone="orange" />
       </div>
 
-      {/* Filter bar */}
-      <div className="mt-5 flex flex-wrap items-center gap-3">
-        <SearchBar value={search} onChange={setSearch} placeholder="Search tenant…" className="w-64" />
-        <div className="flex gap-2">
-          {ALL_STATUSES.map(s => (
-            <button key={s} onClick={() => toggleStatus(s)}
-              className={`rounded-full px-3 py-1 text-xs font-medium border transition-all ${statusFilter.includes(s) ? 'border-[#1565F0] bg-[#EBF3FF] text-[#1254C7]' : 'border-[#E5E7EB] text-[#6B7280] hover:border-[#93C5FD]'}`}>
-              {STATUS_LABELS[s]}
-            </button>
-          ))}
+      {/* Filter panel */}
+      <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm space-y-3">
+        {/* Row 1 — search + account status + quick filters */}
+        <div className="flex flex-wrap items-center gap-3">
+          <SearchBar value={search} onChange={v => { setSearch(v); setPage(1); }} placeholder="Search tenant…" className="w-56" />
+
+          <div className="h-5 w-px bg-gray-200" />
+
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Account</span>
+            <div className="flex gap-1">
+              {(['all', 'active', 'suspended'] as const).map(s => (
+                <Chip key={s} selected={tenantStatusFilter === s}
+                  onClick={() => { setTenantStatusFilter(s); setPage(1); }}>
+                  {s === 'all' ? 'All' : s === 'active' ? 'Active' : 'Suspended'}
+                </Chip>
+              ))}
+            </div>
+          </div>
+
+          <div className="ml-auto flex items-center gap-2">
+            <Chip
+              selected={needsAttention}
+              onClick={() => { setNeedsAttention(n => !n); setPage(1); }}
+              icon={<AlertTriangle className="size-3" />}
+              className={needsAttention ? '!bg-orange-50 !text-orange-700 !ring-orange-300' : ''}>
+              Needs Attention {needsCount > 0 && <span className="ml-0.5 rounded-full bg-orange-400 px-1.5 py-0.5 text-[10px] font-bold text-white">{needsCount}</span>}
+            </Chip>
+            {hasFilters && (
+              <button
+                onClick={() => { setStatusFilter([]); setNeedsAttention(false); setTenantStatusFilter('active'); setPage(1); }}
+                className="flex items-center gap-1 rounded-full px-2.5 py-1 text-xs text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+                <RotateCcw className="size-3" /> Reset
+              </button>
+            )}
+          </div>
         </div>
-        <div className="flex gap-2">
-          {(['all', 'active', 'suspended'] as const).map(s => (
-            <button key={s} onClick={() => setTenantStatusFilter(s)}
-              className={`rounded-full px-3 py-1 text-xs font-medium border capitalize transition-all ${tenantStatusFilter === s ? 'border-[#1565F0] bg-[#EBF3FF] text-[#1254C7]' : 'border-[#E5E7EB] text-[#6B7280] hover:border-[#93C5FD]'}`}>
-              {s}
-            </button>
-          ))}
+
+        {/* Row 2 — credit status chips */}
+        <div className="flex items-center gap-2.5">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Credit Status</span>
+          <div className="flex gap-1.5">
+            {ALL_STATUSES.map(s => (
+              <Chip key={s} selected={statusFilter.includes(s)} onClick={() => toggleStatus(s)}>
+                {STATUS_LABELS[s]}
+              </Chip>
+            ))}
+          </div>
+          {filtered.length !== tenants.length && (
+            <span className="ml-auto text-xs text-gray-400">
+              Showing {filtered.length} of {tenants.length} tenants
+            </span>
+          )}
         </div>
-        <button
-          onClick={() => setNeedsAttention(n => !n)}
-          className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-all ${needsAttention ? 'border-orange-400 bg-orange-50 text-orange-700' : 'border-[#E5E7EB] text-[#6B7280] hover:border-orange-300'}`}>
-          <AlertTriangle className="size-3" />
-          Needs Attention
-        </button>
-        {(statusFilter.length > 0 || needsAttention || tenantStatusFilter !== 'active') && (
-          <button onClick={() => { setStatusFilter([]); setNeedsAttention(false); setTenantStatusFilter('active'); }}
-            className="flex items-center gap-1 text-xs text-[#6B7280] hover:text-[#374151]">
-            <RotateCcw className="size-3" /> Reset
-          </button>
-        )}
       </div>
 
       {/* Table */}
-      <div className="mt-5">
+      <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
         <DataTable
           rows={paginated}
           rowKey={r => r.id}
           columns={[
-            { key: 'name', header: 'Tenant', cell: r => (
-              <div>
-                <p className="font-semibold text-[#111827] text-sm">{r.name}</p>
-                <p className={`text-xs mt-0.5 ${r.tenantStatus === 'active' ? 'text-green-600' : 'text-gray-400'}`}>
-                  {r.tenantStatus === 'active' ? 'Active' : 'Suspended'}
-                </p>
-              </div>
-            )},
-            { key: 'plan', header: 'Plan', cell: r => r.plan
-              ? <span className="text-sm text-[#374151]">{r.plan}</span>
-              : <span className="text-xs text-[#9CA3AF]">—</span>
-            },
-            { key: 'nextAllocation', header: 'Next Allocation', cell: r => (
-              <span className={`text-sm ${r.nextAllocation === 'Paused' ? 'text-amber-600 font-medium' : 'text-[#374151]'}`}>
-                {r.nextAllocation ?? '—'}
-              </span>
-            )},
-            { key: 'balance', header: 'Available Balance', align: 'right', cell: r => (
-              <span className={`font-semibold text-sm ${r.balance < 0 ? 'text-red-700' : r.balance === 0 ? 'text-red-500' : 'text-[#111827]'}`}>
-                {r.balance < 0 ? r.balance.toLocaleString() : r.balance.toLocaleString()}
-              </span>
-            )},
-            { key: 'creditStatus', header: 'Credit Status', cell: r => <CreditStatusBadge status={r.creditStatus} /> },
-            { key: 'allocationStatus', header: 'Allocation', cell: r => (
-              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${r.allocationStatus === 'active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                {r.allocationStatus === 'active' ? 'Active' : 'Inactive'}
-              </span>
-            )},
-            { key: 'actions' as keyof TenantCredit, header: '', cell: r => {
-              const suspended = r.tenantStatus === 'suspended';
-              return (
-                <div className="flex gap-1 justify-end">
-                  <Tooltip content="View monitoring dashboard">
-                    <Button variant="ghost" size="sm" onClick={() => setMonitorTenant(r)}>Dashboard</Button>
-                  </Tooltip>
-                  <Tooltip content={suspended ? 'Unavailable for suspended tenants' : 'Change plan'}>
-                    <Button variant="soft" size="sm" disabled={suspended} onClick={() => setChangePlanTenant(r)}>Change Plan</Button>
-                  </Tooltip>
-                  <Tooltip content={suspended ? 'Unavailable for suspended tenants' : 'Add credits'}>
-                    <Button variant="accent" size="sm" disabled={suspended} onClick={() => setTopUpTenant(r)}>Top-up</Button>
-                  </Tooltip>
-                  <Button variant="ghost" size="sm" onClick={() => setHistoryTenant(r)}>History</Button>
+            {
+              key: 'name', header: 'Tenant',
+              cell: r => (
+                <div>
+                  <p className="font-semibold text-[#111827] text-sm">{r.name}</p>
+                  <p className={`text-xs mt-0.5 ${r.tenantStatus === 'active' ? 'text-green-600' : 'text-gray-400'}`}>
+                    {r.tenantStatus === 'active' ? 'Active account' : 'Suspended'}
+                  </p>
                 </div>
-              );
-            }},
+              ),
+            },
+            {
+              key: 'plan', header: 'Plan',
+              cell: r => r.plan
+                ? <span className="rounded-full bg-[#EBF3FF] px-2.5 py-1 text-xs font-semibold text-[#1254C7]">{r.plan}</span>
+                : <span className="text-xs text-[#9CA3AF]">No plan</span>,
+            },
+            {
+              key: 'balance', header: 'Balance', align: 'right',
+              cell: r => (
+                <span className={`font-bold text-sm tabular-nums ${r.balance < 0 ? 'text-red-700' : r.balance === 0 ? 'text-red-500' : 'text-[#111827]'}`}>
+                  {r.balance.toLocaleString()}
+                </span>
+              ),
+            },
+            {
+              key: 'creditStatus', header: 'Credit Health',
+              cell: r => <CreditStatusBadge status={r.creditStatus} />,
+            },
+            {
+              key: 'nextAllocation', header: 'Next Allocation',
+              cell: r => (
+                <span className={`text-sm ${r.nextAllocation === 'Paused' ? 'font-medium text-amber-600' : 'text-[#374151]'}`}>
+                  {r.nextAllocation ?? '—'}
+                </span>
+              ),
+            },
+            {
+              key: 'allocationStatus', header: 'Allocation',
+              cell: r => (
+                <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${r.allocationStatus === 'active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                  <span className={`size-1.5 rounded-full ${r.allocationStatus === 'active' ? 'bg-green-500' : 'bg-gray-400'}`} />
+                  {r.allocationStatus === 'active' ? 'Active' : 'Inactive'}
+                </span>
+              ),
+            },
+            {
+              key: 'actions' as keyof TenantCredit, header: '', align: 'right',
+              cell: r => {
+                const suspended = r.tenantStatus === 'suspended';
+                return (
+                  <div className="flex items-center justify-end gap-1.5">
+                    <Tooltip content={suspended ? 'Unavailable for suspended tenants' : 'Add credits to this tenant'}>
+                      <Button variant="accent" size="sm" disabled={suspended}
+                        onClick={() => setTopUpTenant(r)}>
+                        Top-up
+                      </Button>
+                    </Tooltip>
+                    <DropdownMenu
+                      align="end"
+                      trigger={
+                        <IconButton variant="ghost" size="sm" label="More actions"
+                          icon={<MoreHorizontal className="size-4" />} />
+                      }
+                      items={[
+                        { type: 'label', label: 'Actions' },
+                        { label: 'Change Plan', disabled: suspended, onSelect: () => setChangePlanTenant(r) },
+                        { label: 'View Dashboard', onSelect: () => setMonitorTenant(r) },
+                        { label: 'Transaction History', onSelect: () => setHistoryTenant(r) },
+                      ]}
+                    />
+                  </div>
+                );
+              },
+            },
           ]}
-          footer={<Pagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} itemLabel="tenants" />}
+          footer={
+            <Pagination page={page} pageSize={pageSize} total={filtered.length}
+              onPageChange={setPage} itemLabel="tenants" />
+          }
         />
       </div>
 
-      {changePlanTenant && <ChangePlanModal tenant={changePlanTenant} onClose={() => setChangePlanTenant(null)} />}
-      {topUpTenant && <TopUpModal tenant={topUpTenant} onClose={() => setTopUpTenant(null)} />}
+      {/* Modals */}
+      {changePlanTenant && (
+        <ChangePlanModal tenant={changePlanTenant} onClose={() => setChangePlanTenant(null)} />
+      )}
+      {topUpTenant && (
+        <TopUpModal tenant={topUpTenant} onClose={() => setTopUpTenant(null)} />
+      )}
       {historyTenant && (
-        <Modal open onOpenChange={(v) => { if (!v) setHistoryTenant(null); }} title={`Transaction History — ${historyTenant.name}`}>
+        <Modal open onOpenChange={(v) => { if (!v) setHistoryTenant(null); }}
+          title={`Transaction History — ${historyTenant.name}`} size="lg">
           <CreditTransactionHistory tenantName={historyTenant.name} />
         </Modal>
       )}
       {monitorTenant && (
-        <Modal open onOpenChange={(v) => { if (!v) setMonitorTenant(null); }} title={`Credit Dashboard — ${monitorTenant.name}`}>
+        <Modal open onOpenChange={(v) => { if (!v) setMonitorTenant(null); }}
+          title={`Credit Dashboard — ${monitorTenant.name}`} size="xl">
           <CreditMonitoringContent tenant={monitorTenant} />
         </Modal>
       )}
