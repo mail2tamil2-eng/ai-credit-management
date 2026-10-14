@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Download, Filter, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Download, RotateCcw, AlertTriangle } from 'lucide-react';
 import {
-  Button, DataTable, Pagination, Modal, FormField, SearchBar, Chip, Tooltip, PageHeader,
+  Button, DataTable, Pagination, Modal, FormField, SearchBar, Tooltip, PageHeader,
 } from '../components/saas';
 import { CreditStatusBadge } from '../components/CreditStatusBadge';
 import type { TenantCredit, CreditStatus, Plan } from './creditTypes';
@@ -22,7 +22,7 @@ function ChangePlanModal({ tenant, onClose }: { tenant: TenantCredit; onClose: (
 
   if (confirmed && selected) {
     return (
-      <Modal open onClose={onClose} title="Confirm Plan Change"
+      <Modal open onOpenChange={(v) => { if (!v) onClose(); }} title="Confirm Plan Change"
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setConfirmed(false)}>Back</Button>
@@ -43,7 +43,7 @@ function ChangePlanModal({ tenant, onClose }: { tenant: TenantCredit; onClose: (
   }
 
   return (
-    <Modal open onClose={onClose} title="Change Plan"
+    <Modal open onOpenChange={(v) => { if (!v) onClose(); }} title="Change Plan"
       footer={
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
@@ -57,20 +57,22 @@ function ChangePlanModal({ tenant, onClose }: { tenant: TenantCredit; onClose: (
           {tenant.plan && <><span className="mx-2 text-[#D1D5DB]">|</span><span className="text-[#6B7280]">Current Plan: </span><span className="font-medium">{tenant.plan}</span></>}
         </div>
         <FormField label="Select New Plan" required>
-          <div className="space-y-2">
-            {activePlans.map(p => (
-              <button key={p.id} onClick={() => setSelected(p)}
-                className={`w-full rounded-xl border-2 p-3 text-left transition-all ${selected?.id === p.id ? 'border-[#1565F0] bg-[#EBF3FF]' : 'border-[#E5E7EB] hover:border-[#93C5FD]'}`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-sm text-[#111827]">{p.name}</p>
-                    <p className="text-xs text-[#6B7280]">{p.interval} · {p.credits.toLocaleString()} credits</p>
+          {() => (
+            <div className="space-y-2">
+              {activePlans.map(p => (
+                <button key={p.id} onClick={() => setSelected(p)}
+                  className={`w-full rounded-xl border-2 p-3 text-left transition-all ${selected?.id === p.id ? 'border-[#1565F0] bg-[#EBF3FF]' : 'border-[#E5E7EB] hover:border-[#93C5FD]'}`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold text-sm text-[#111827]">{p.name}</p>
+                      <p className="text-xs text-[#6B7280]">{p.interval} · {p.credits.toLocaleString()} credits</p>
+                    </div>
+                    {selected?.id === p.id && <span className="size-4 rounded-full bg-[#1565F0] flex items-center justify-center"><span className="size-2 rounded-full bg-white" /></span>}
                   </div>
-                  {selected?.id === p.id && <span className="size-4 rounded-full bg-[#1565F0] flex items-center justify-center"><span className="size-2 rounded-full bg-white" /></span>}
-                </div>
-              </button>
-            ))}
-          </div>
+                </button>
+              ))}
+            </div>
+          )}
         </FormField>
       </div>
     </Modal>
@@ -87,7 +89,7 @@ function TopUpModal({ tenant, onClose }: { tenant: TenantCredit; onClose: () => 
 
   if (confirmed && amount > 0) {
     return (
-      <Modal open onClose={onClose} title="Confirm Top-up"
+      <Modal open onOpenChange={(v) => { if (!v) onClose(); }} title="Confirm Top-up"
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setConfirmed(false)}>Back</Button>
@@ -106,7 +108,7 @@ function TopUpModal({ tenant, onClose }: { tenant: TenantCredit; onClose: () => 
   }
 
   return (
-    <Modal open onClose={onClose} title="Add Credits (Top-up)"
+    <Modal open onOpenChange={(v) => { if (!v) onClose(); }} title="Add Credits (Top-up)"
       footer={
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
@@ -119,9 +121,11 @@ function TopUpModal({ tenant, onClose }: { tenant: TenantCredit; onClose: () => 
           <div><span className="text-[#6B7280]">Current Balance: </span><span className="font-semibold text-[#111827]">{tenant.balance.toLocaleString()}</span></div>
         </div>
         <FormField label="Credits to Add" required hint="Must be a positive number">
-          <input type="number" min={1}
-            className="w-full rounded-lg border border-[#6B7280] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1565F0]"
-            value={credits} onChange={e => setCredits(e.target.value)} placeholder="e.g. 1000" />
+          {({ id }) => (
+            <input id={id} type="number" min={1}
+              className="w-full rounded-lg border border-[#6B7280] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1565F0]"
+              value={credits} onChange={e => setCredits(e.target.value)} placeholder="e.g. 1000" />
+          )}
         </FormField>
         {amount > 0 && (
           <div className="rounded-lg bg-green-50 px-3 py-2 text-sm flex items-center justify-between">
@@ -130,9 +134,11 @@ function TopUpModal({ tenant, onClose }: { tenant: TenantCredit; onClose: () => 
           </div>
         )}
         <FormField label="Reference / Remarks" required hint="For traceability">
-          <input
-            className="w-full rounded-lg border border-[#6B7280] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1565F0]"
-            value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. REF-20261013" />
+          {({ id }) => (
+            <input id={id}
+              className="w-full rounded-lg border border-[#6B7280] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1565F0]"
+              value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. REF-20261013" />
+          )}
         </FormField>
       </div>
     </Modal>
@@ -178,7 +184,6 @@ export default function TenantCreditPage() {
     <div className="px-8 py-6">
       <PageHeader
         title="AI Credit Management"
-        subtitle="Monitor and manage AI credits across all tenants"
         actions={
           <Button variant="secondary" leftIcon={<Download className="size-4" />}>Export CSV</Button>
         }
@@ -290,12 +295,12 @@ export default function TenantCreditPage() {
       {changePlanTenant && <ChangePlanModal tenant={changePlanTenant} onClose={() => setChangePlanTenant(null)} />}
       {topUpTenant && <TopUpModal tenant={topUpTenant} onClose={() => setTopUpTenant(null)} />}
       {historyTenant && (
-        <Modal open onClose={() => setHistoryTenant(null)} title={`Transaction History — ${historyTenant.name}`}>
+        <Modal open onOpenChange={(v) => { if (!v) setHistoryTenant(null); }} title={`Transaction History — ${historyTenant.name}`}>
           <CreditTransactionHistory tenantName={historyTenant.name} />
         </Modal>
       )}
       {monitorTenant && (
-        <Modal open onClose={() => setMonitorTenant(null)} title={`Credit Dashboard — ${monitorTenant.name}`}>
+        <Modal open onOpenChange={(v) => { if (!v) setMonitorTenant(null); }} title={`Credit Dashboard — ${monitorTenant.name}`}>
           <CreditMonitoringContent tenant={monitorTenant} />
         </Modal>
       )}

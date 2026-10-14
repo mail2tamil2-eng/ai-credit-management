@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router';
-import { CreditCard, BookOpen, BarChart3, LayoutDashboard, User } from 'lucide-react';
+import { CreditCard, BookOpen, BarChart3, LayoutDashboard } from 'lucide-react';
 import logo from './imports/AXLE-Korp-LOGO__2_.jpg';
 import { AppHeader, AppSidebar } from './app/components/saas';
 import TenantCreditPage from './app/pages/TenantCreditPage';
@@ -31,7 +31,7 @@ function Layout() {
     <div className="flex h-screen bg-[#F9FAFB]" style={{ fontFamily: 'Nunito Sans, system-ui, sans-serif' }}>
       <AppSidebar
         groups={[
-          { label: role === 'site' ? 'Site Admin' : 'Organisation', items: nav },
+          { title: role === 'site' ? 'Site Admin' : 'Organisation', items: nav },
         ]}
         activeId={pathname}
         onNavigate={(id) => navigate(id)}

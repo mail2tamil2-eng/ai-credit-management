@@ -34,7 +34,7 @@ function PlanModal({
   return (
     <Modal
       open={open}
-      onClose={() => onClose()}
+      onOpenChange={(v) => { if (!v) onClose(); }}
       title={initial ? 'Edit Plan' : 'Create Plan'}
       footer={
         <div className="flex justify-end gap-2">
@@ -47,40 +47,48 @@ function PlanModal({
     >
       <div className="flex flex-col gap-4">
         <FormField label="Plan Name" required hint="Must be unique">
-          <input
-            className="w-full rounded-lg border border-[#6B7280] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1565F0]"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            placeholder="e.g. Growth"
-          />
+          {({ id }) => (
+            <input id={id}
+              className="w-full rounded-lg border border-[#6B7280] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1565F0]"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="e.g. Growth"
+            />
+          )}
         </FormField>
         <FormField label="Allocation Interval" required>
-          <select
-            className="w-full rounded-lg border border-[#6B7280] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1565F0]"
-            value={interval}
-            onChange={e => setInterval(e.target.value as PlanInterval)}
-          >
-            {INTERVALS.map(i => <option key={i} value={i}>{i}</option>)}
-          </select>
+          {({ id }) => (
+            <select id={id}
+              className="w-full rounded-lg border border-[#6B7280] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1565F0]"
+              value={interval}
+              onChange={e => setInterval(e.target.value as PlanInterval)}
+            >
+              {INTERVALS.map(i => <option key={i} value={i}>{i}</option>)}
+            </select>
+          )}
         </FormField>
         <FormField label="Credits" required hint="Credits allocated per interval">
-          <input
-            type="number"
-            min={1}
-            className="w-full rounded-lg border border-[#6B7280] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1565F0]"
-            value={credits}
-            onChange={e => setCredits(e.target.value)}
-            placeholder="e.g. 5000"
-          />
+          {({ id }) => (
+            <input id={id}
+              type="number"
+              min={1}
+              className="w-full rounded-lg border border-[#6B7280] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1565F0]"
+              value={credits}
+              onChange={e => setCredits(e.target.value)}
+              placeholder="e.g. 5000"
+            />
+          )}
         </FormField>
         <FormField label="Description">
-          <textarea
-            rows={2}
-            className="w-full rounded-lg border border-[#6B7280] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1565F0] resize-none"
-            value={description}
-            onChange={e => setDescription(e.target.value)}
-            placeholder="Optional description"
-          />
+          {({ id }) => (
+            <textarea id={id}
+              rows={2}
+              className="w-full rounded-lg border border-[#6B7280] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1565F0] resize-none"
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="Optional description"
+            />
+          )}
         </FormField>
       </div>
     </Modal>
@@ -89,7 +97,7 @@ function PlanModal({
 
 function DeleteBlockedModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
-    <Modal open={open} onClose={onClose} title="Cannot Delete Plan"
+    <Modal open={open} onOpenChange={(v) => { if (!v) onClose(); }} title="Cannot Delete Plan"
       footer={<div className="flex justify-end"><Button onClick={onClose}>OK</Button></div>}>
       <p className="text-sm text-[#374151]">
         This plan is assigned to tenants and cannot be deleted. Deactivate it instead.
@@ -131,7 +139,6 @@ export default function PlanManagementPage() {
     <div className="px-8 py-6">
       <PageHeader
         title="Plan Management"
-        subtitle="Create and manage AI credit allocation plans"
         actions={<Button leftIcon={<Plus />} onClick={() => setCreateOpen(true)}>Create Plan</Button>}
       />
 
