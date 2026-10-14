@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, PowerOff, Power } from 'lucide-react';
-import { Button, DataTable, Pagination, Modal, FormField, PageHeader } from '../components/saas';
+import { Plus, BookOpen, Users, CheckCircle2, ArchiveX, Pencil, Trash2, PowerOff, Power, MoreHorizontal } from 'lucide-react';
+import {
+  Button, DataTable, Pagination, Modal, FormField, TextInput, TextArea, SelectInput,
+  PageHeader, StatWidget, SearchBar, Chip, DropdownMenu, IconButton,
+} from '../components/saas';
 import type { Plan, PlanInterval } from './creditTypes';
 import { MOCK_PLANS } from './creditTypes';
 
 const INTERVALS: PlanInterval[] = ['Monthly', 'Yearly'];
 
-function PlanModal({
-  open, onClose, initial,
-}: {
+// ── Plan Create / Edit Modal ───────────────────────────────────────────────────
+function PlanModal({ open, onClose, initial }: {
   open: boolean;
   onClose: (saved?: Plan) => void;
   initial?: Plan;
@@ -17,15 +19,17 @@ function PlanModal({
   const [interval, setInterval] = useState<PlanInterval>(initial?.interval ?? 'Monthly');
   const [credits, setCredits] = useState(String(initial?.credits ?? ''));
   const [description, setDescription] = useState(initial?.description ?? '');
+  const creditsNum = Number(credits);
+  const valid = name.trim() && creditsNum > 0;
 
   function handleSave() {
-    if (!name.trim() || !credits || Number(credits) <= 0) return;
+    if (!valid) return;
     onClose({
       id: initial?.id ?? `p${Date.now()}`,
       name: name.trim(),
       interval,
-      credits: Number(credits),
-      description,
+      credits: creditsNum,
+      description: description.trim() || undefined,
       status: initial?.status ?? 'active',
       assignedTenants: initial?.assignedTenants ?? 0,
     });
@@ -35,59 +39,54 @@ function PlanModal({
     <Modal
       open={open}
       onOpenChange={(v) => { if (!v) onClose(); }}
-      title={initial ? 'Edit Plan' : 'Create Plan'}
+      title={initial ? `Edit Plan — ${initial.name}` : 'Create New Plan'}
+      size="sm"
       footer={
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={() => onClose()}>Cancel</Button>
-          <Button onClick={handleSave} disabled={!name.trim() || !credits || Number(credits) <= 0}>
+          <Button onClick={handleSave} disabled={!valid}>
             {initial ? 'Save Changes' : 'Create Plan'}
           </Button>
         </div>
       }
     >
       <div className="flex flex-col gap-4">
-        <FormField label="Plan Name" required hint="Must be unique">
-          {({ id }) => (
-            <input id={id}
-              className="w-full rounded-lg border border-[#6B7280] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1565F0]"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="e.g. Growth"
-            />
+        <FormField label="Plan Name" required hint="Must be unique across all plans">
+          {({ id, describedBy, invalid }) => (
+            <TextInput id={id} aria-describedby={describedBy} invalid={invalid}
+              value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Growth" />
           )}
         </FormField>
-        <FormField label="Allocation Interval" required>
-          {({ id }) => (
-            <select id={id}
-              className="w-full rounded-lg border border-[#6B7280] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1565F0]"
-              value={interval}
-              onChange={e => setInterval(e.target.value as PlanInterval)}
-            >
-              {INTERVALS.map(i => <option key={i} value={i}>{i}</option>)}
-            </select>
-          )}
-        </FormField>
-        <FormField label="Credits" required hint="Credits allocated per interval">
-          {({ id }) => (
-            <input id={id}
-              type="number"
-              min={1}
-              className="w-full rounded-lg border border-[#6B7280] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1565F0]"
-              value={credits}
-              onChange={e => setCredits(e.target.value)}
-              placeholder="e.g. 5000"
-            />
-          )}
-        </FormField>
+
+        <div className="grid grid-cols-2 gap-3">
+          <FormField label="Billing Interval" required>
+            {({ id }) => (
+              <SelectInput id={id} value={interval}
+                onChange={e => setInterval(e.target.value as PlanInterval)}
+                options={INTERVALS.map(i => ({ value: i, label: i }))} />
+            )}
+          </FormField>
+          <FormField label="Credits / Interval" required hint="Allocated each period">
+            {({ id, describedBy, invalid }) => (
+              <TextInput id={id} aria-describedby={describedBy} invalid={invalid}
+                type="number" min={1} value={credits}
+                onChange={e => setCredits(e.target.value)} placeholder="e.g. 5000" />
+            )}
+          </FormField>
+        </div>
+
+        {credits && creditsNum > 0 && (
+          <div className="rounded-xl bg-[#EBF3FF] px-4 py-2.5 text-sm flex items-center justify-between">
+            <span className="text-[#6B7280]">Credits per {interval.toLowerCase()}</span>
+            <span className="font-bold text-[#1565F0] text-base">{creditsNum.toLocaleString()}</span>
+          </div>
+        )}
+
         <FormField label="Description">
           {({ id }) => (
-            <textarea id={id}
-              rows={2}
-              className="w-full rounded-lg border border-[#6B7280] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1565F0] resize-none"
-              value={description}
+            <TextArea id={id} rows={2} value={description}
               onChange={e => setDescription(e.target.value)}
-              placeholder="Optional description"
-            />
+              placeholder="Short description (optional)" />
           )}
         </FormField>
       </div>
@@ -95,24 +94,78 @@ function PlanModal({
   );
 }
 
-function DeleteBlockedModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+// ── Delete Blocked Modal ───────────────────────────────────────────────────────
+function DeleteBlockedModal({ open, onClose, plan }: {
+  open: boolean;
+  onClose: () => void;
+  plan: Plan | null;
+}) {
   return (
-    <Modal open={open} onOpenChange={(v) => { if (!v) onClose(); }} title="Cannot Delete Plan"
-      footer={<div className="flex justify-end"><Button onClick={onClose}>OK</Button></div>}>
+    <Modal open={open} onOpenChange={(v) => { if (!v) onClose(); }}
+      title="Cannot Delete Plan" size="sm" tone="warning"
+      footer={<div className="flex justify-end gap-2">
+        <Button variant="secondary" onClick={onClose}>Close</Button>
+        <Button variant="secondary" onClick={onClose}>Deactivate Instead</Button>
+      </div>}>
+      <div className="space-y-3 text-sm text-[#374151]">
+        <p>
+          <strong>{plan?.name}</strong> is assigned to{' '}
+          <strong>{plan?.assignedTenants} tenant{plan?.assignedTenants !== 1 ? 's' : ''}</strong>.
+          Plans with active assignments cannot be deleted.
+        </p>
+        <p className="text-[#6B7280]">
+          Deactivate the plan to prevent new sign-ups while keeping existing tenants unaffected.
+        </p>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Confirm Delete Modal ───────────────────────────────────────────────────────
+function ConfirmDeleteModal({ open, onClose, onConfirm, plan }: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  plan: Plan | null;
+}) {
+  return (
+    <Modal open={open} onOpenChange={(v) => { if (!v) onClose(); }}
+      title="Delete Plan?" size="sm" tone="danger"
+      footer={<div className="flex justify-end gap-2">
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button variant="danger" onClick={onConfirm}>Delete Plan</Button>
+      </div>}>
       <p className="text-sm text-[#374151]">
-        This plan is assigned to tenants and cannot be deleted. Deactivate it instead.
+        Are you sure you want to permanently delete <strong>{plan?.name}</strong>?
+        This action cannot be undone.
       </p>
     </Modal>
   );
 }
 
+// ── Main Page ──────────────────────────────────────────────────────────────────
 export default function PlanManagementPage() {
   const [plans, setPlans] = useState<Plan[]>(MOCK_PLANS);
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Plan | null>(null);
-  const [deleteBlocked, setDeleteBlocked] = useState(false);
+  const [deleteBlockedPlan, setDeleteBlockedPlan] = useState<Plan | null>(null);
+  const [deletePlan, setDeletePlan] = useState<Plan | null>(null);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [page, setPage] = useState(1);
   const pageSize = 10;
+
+  const totalTenants = plans.reduce((s, p) => s + p.assignedTenants, 0);
+  const activePlans = plans.filter(p => p.status === 'active');
+  const inactivePlans = plans.filter(p => p.status === 'inactive');
+
+  const filtered = plans.filter(p => {
+    if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
+    if (statusFilter !== 'all' && p.status !== statusFilter) return false;
+    return true;
+  });
+
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   function handleCreate(saved?: Plan) {
     if (saved) setPlans(p => [saved, ...p]);
@@ -125,63 +178,163 @@ export default function PlanManagementPage() {
   }
 
   function handleToggle(plan: Plan) {
-    setPlans(p => p.map(x => x.id === plan.id ? { ...x, status: x.status === 'active' ? 'inactive' : 'active' } : x));
+    setPlans(p => p.map(x => x.id === plan.id
+      ? { ...x, status: x.status === 'active' ? 'inactive' : 'active' }
+      : x));
   }
 
-  function handleDelete(plan: Plan) {
-    if (plan.assignedTenants > 0) { setDeleteBlocked(true); return; }
-    setPlans(p => p.filter(x => x.id !== plan.id));
+  function handleDeleteClick(plan: Plan) {
+    if (plan.assignedTenants > 0) { setDeleteBlockedPlan(plan); return; }
+    setDeletePlan(plan);
   }
 
-  const paginated = plans.slice((page - 1) * pageSize, page * pageSize);
+  function handleDeleteConfirm() {
+    if (deletePlan) setPlans(p => p.filter(x => x.id !== deletePlan.id));
+    setDeletePlan(null);
+  }
 
   return (
-    <div className="px-8 py-6">
+    <div className="px-8 py-6 space-y-6">
+      {/* Header */}
       <PageHeader
         title="Plan Management"
-        actions={<Button leftIcon={<Plus />} onClick={() => setCreateOpen(true)}>Create Plan</Button>}
+        actions={
+          <Button leftIcon={<Plus className="size-4" />} onClick={() => setCreateOpen(true)}>
+            Create Plan
+          </Button>
+        }
       />
 
-      <div className="mt-6">
+      {/* KPI cards */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <StatWidget label="Total Plans" value={plans.length} icon={BookOpen} tone="blue" />
+        <StatWidget label="Active Plans" value={activePlans.length} icon={CheckCircle2} tone="green"
+          hint={`${inactivePlans.length} inactive`} />
+        <StatWidget label="Tenants Enrolled" value={totalTenants} icon={Users} tone="violet"
+          hint="Across all active plans" />
+        <StatWidget label="Inactive / Legacy" value={inactivePlans.length} icon={ArchiveX} tone="amber"
+          hint={inactivePlans.length > 0 ? 'Consider removing' : 'None'} />
+      </div>
+
+      {/* Filter row */}
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm">
+        <SearchBar value={search} onChange={v => { setSearch(v); setPage(1); }}
+          placeholder="Search plans…" className="w-52" />
+        <div className="h-5 w-px bg-gray-200" />
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Status</span>
+          <div className="flex gap-1">
+            {(['all', 'active', 'inactive'] as const).map(s => (
+              <Chip key={s} selected={statusFilter === s}
+                onClick={() => { setStatusFilter(s); setPage(1); }}>
+                {s === 'all' ? 'All' : s === 'active' ? 'Active' : 'Inactive'}
+              </Chip>
+            ))}
+          </div>
+        </div>
+        {filtered.length !== plans.length && (
+          <span className="ml-auto text-xs text-gray-400">
+            Showing {filtered.length} of {plans.length} plans
+          </span>
+        )}
+      </div>
+
+      {/* Table */}
+      <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
         <DataTable
           rows={paginated}
           rowKey={r => r.id}
           columns={[
-            { key: 'name', header: 'Plan Name' },
-            { key: 'interval', header: 'Interval', cell: r => (
-              <span className="rounded-full bg-[#EBF3FF] px-2.5 py-0.5 text-xs font-medium text-[#1254C7]">{r.interval}</span>
-            )},
-            { key: 'credits', header: 'Credits / Interval', align: 'right', cell: r => (
-              <span className="font-semibold text-[#111827]">{r.credits.toLocaleString()}</span>
-            )},
-            { key: 'assignedTenants', header: 'Tenants', align: 'right' },
-            { key: 'status', header: 'Status', cell: r => (
-              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${r.status === 'active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                <span className={`size-1.5 rounded-full ${r.status === 'active' ? 'bg-green-500' : 'bg-gray-400'}`} />
-                {r.status === 'active' ? 'Active' : 'Inactive'}
-              </span>
-            )},
-            { key: 'actions' as keyof Plan, header: '', align: 'right', cell: r => (
-              <div className="flex justify-end gap-1">
-                <Button variant="ghost" size="sm" leftIcon={<Pencil className="size-3.5" />} onClick={() => setEditTarget(r)}>Edit</Button>
-                <Button variant="ghost" size="sm" leftIcon={r.status === 'active' ? <PowerOff className="size-3.5" /> : <Power className="size-3.5" />}
-                  onClick={() => handleToggle(r)}>
-                  {r.status === 'active' ? 'Deactivate' : 'Activate'}
-                </Button>
-                <Button variant="ghost" size="sm" leftIcon={<Trash2 className="size-3.5 text-red-500" />}
-                  className="text-red-600 hover:bg-red-50" onClick={() => handleDelete(r)}>
-                  Delete
-                </Button>
-              </div>
-            )},
+            {
+              key: 'name', header: 'Plan',
+              cell: r => (
+                <div>
+                  <p className="font-semibold text-[#111827] text-sm">{r.name}</p>
+                  {r.description && <p className="text-xs text-[#6B7280] mt-0.5">{r.description}</p>}
+                </div>
+              ),
+            },
+            {
+              key: 'interval', header: 'Billing',
+              cell: r => (
+                <span className="rounded-full bg-[#EBF3FF] px-2.5 py-1 text-xs font-semibold text-[#1254C7]">
+                  {r.interval}
+                </span>
+              ),
+            },
+            {
+              key: 'credits', header: 'Credits / Period', align: 'right',
+              cell: r => (
+                <div className="text-right">
+                  <p className="font-bold text-[#111827] text-sm tabular-nums">{r.credits.toLocaleString()}</p>
+                  <p className="text-[10px] text-[#9CA3AF]">per {r.interval.toLowerCase()}</p>
+                </div>
+              ),
+            },
+            {
+              key: 'assignedTenants', header: 'Assigned Tenants', align: 'right',
+              cell: r => (
+                <div className="flex items-center justify-end gap-1.5">
+                  {r.assignedTenants > 0
+                    ? <span className="rounded-full bg-[#EBF3FF] px-2.5 py-0.5 text-xs font-semibold text-[#1254C7]">{r.assignedTenants} tenant{r.assignedTenants !== 1 ? 's' : ''}</span>
+                    : <span className="text-xs text-[#9CA3AF]">None</span>}
+                </div>
+              ),
+            },
+            {
+              key: 'status', header: 'Status',
+              cell: r => (
+                <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${r.status === 'active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                  <span className={`size-1.5 rounded-full ${r.status === 'active' ? 'bg-green-500' : 'bg-gray-400'}`} />
+                  {r.status === 'active' ? 'Active' : 'Inactive'}
+                </span>
+              ),
+            },
+            {
+              key: 'actions' as keyof Plan, header: '', align: 'right',
+              cell: r => (
+                <div className="flex items-center justify-end gap-1.5">
+                  <Button variant="soft" size="sm" leftIcon={<Pencil className="size-3.5" />}
+                    onClick={() => setEditTarget(r)}>
+                    Edit
+                  </Button>
+                  <DropdownMenu
+                    align="end"
+                    trigger={
+                      <IconButton variant="ghost" size="sm" label="More actions"
+                        icon={<MoreHorizontal className="size-4" />} />
+                    }
+                    items={[
+                      {
+                        label: r.status === 'active' ? 'Deactivate Plan' : 'Activate Plan',
+                        icon: r.status === 'active' ? <PowerOff className="size-4" /> : <Power className="size-4" />,
+                        onSelect: () => handleToggle(r),
+                      },
+                      { type: 'separator' },
+                      {
+                        label: 'Delete Plan',
+                        icon: <Trash2 className="size-4" />,
+                        destructive: true,
+                        onSelect: () => handleDeleteClick(r),
+                      },
+                    ]}
+                  />
+                </div>
+              ),
+            },
           ]}
-          footer={<Pagination page={page} pageSize={pageSize} total={plans.length} onPageChange={setPage} itemLabel="plans" />}
+          footer={
+            <Pagination page={page} pageSize={pageSize} total={filtered.length}
+              onPageChange={setPage} itemLabel="plans" />
+          }
         />
       </div>
 
+      {/* Modals */}
       <PlanModal open={createOpen} onClose={handleCreate} />
       {editTarget && <PlanModal open onClose={handleEdit} initial={editTarget} />}
-      <DeleteBlockedModal open={deleteBlocked} onClose={() => setDeleteBlocked(false)} />
+      <DeleteBlockedModal open={!!deleteBlockedPlan} onClose={() => setDeleteBlockedPlan(null)} plan={deleteBlockedPlan} />
+      <ConfirmDeleteModal open={!!deletePlan} onClose={() => setDeletePlan(null)} onConfirm={handleDeleteConfirm} plan={deletePlan} />
     </div>
   );
 }
