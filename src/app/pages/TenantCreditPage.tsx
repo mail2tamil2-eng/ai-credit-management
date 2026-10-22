@@ -1,14 +1,184 @@
 import { useState } from 'react';
-import { Download, AlertTriangle, Users, ShieldOff, Activity, MoreHorizontal, ChevronDown, X } from 'lucide-react';
+import { Download, AlertTriangle, Users, ShieldOff, Activity, MoreHorizontal, ChevronDown, X, Plus, Check, Building2, Info, Pencil, PowerOff, Power } from 'lucide-react';
 import {
   Button, DataTable, Pagination, Modal, FormField, SearchBar,
-  Tooltip, PageHeader, StatWidget, DropdownMenu, IconButton,
+  Tooltip, PageHeader, StatWidget, DropdownMenu, IconButton, TextInput, TextArea, SelectInput,
 } from '../components/saas';
+import { Switch } from '../components/ui/switch';
 import { CreditStatusBadge } from '../components/CreditStatusBadge';
 import type { TenantCredit, CreditStatus, Plan } from './creditTypes';
 import { MOCK_TENANTS, MOCK_PLANS } from './creditTypes';
 import CreditTransactionHistory from './CreditTransactionHistory';
 import { CreditMonitoringContent } from './CreditMonitoringPage';
+import { useRole } from '../context/RoleContext';
+
+// ── Create Tenant Modal ────────────────────────────────────────────────────────
+function CreateTenantModal({ onClose, onCreated }: { onClose: () => void; onCreated: (t: TenantCredit) => void }) {
+  const [name, setName] = useState('');
+  const [planId, setPlanId] = useState('');
+  const [rollover, setRollover] = useState(true);
+  const [topUp, setTopUp] = useState('');
+  const [reference, setReference] = useState('');
+  const [nameError, setNameError] = useState('');
+  const [refError, setRefError] = useState('');
+
+  const activePlans = MOCK_PLANS.filter(p => p.status === 'active');
+  const selectedPlan = activePlans.find(p => p.id === planId) ?? null;
+  const planCredits = selectedPlan?.credits ?? 0;
+  const extraCredits = Number(topUp) || 0;
+  const openingBalance = planCredits + extraCredits;
+
+  function deriveCreditStatus(balance: number, planCreds: number): CreditStatus {
+    if (balance === 0) return 'exhausted';
+    if (planCreds > 0) {
+      const pct = balance / planCreds;
+      if (pct <= 0.05) return 'critical';
+      if (pct <= 0.20) return 'low';
+    }
+    return 'active';
+  }
+
+  function handleCreate() {
+    let valid = true;
+    if (!name.trim()) { setNameError('Tenant name is required'); valid = false; }
+    if (extraCredits > 0 && !reference.trim()) { setRefError('Reference is required for top-up'); valid = false; }
+    if (!valid) return;
+    const tenant: TenantCredit = {
+      id: `T-${Date.now().toString(36).toUpperCase().slice(-6)}`,
+      name: name.trim(),
+      tenantStatus: 'active',
+      plan: selectedPlan ? `${selectedPlan.name} (${selectedPlan.interval})` : undefined,
+      nextAllocation: selectedPlan
+        ? (selectedPlan.interval === 'Monthly' ? '01 Nov 2026' : '01 Oct 2027')
+        : undefined,
+      balance: openingBalance,
+      creditStatus: deriveCreditStatus(openingBalance, planCredits),
+      allocationStatus: selectedPlan ? 'active' : 'inactive',
+    };
+    onCreated(tenant);
+    onClose();
+  }
+
+  const planOptions = [
+    { value: '', label: 'No plan' },
+    ...activePlans.map(p => ({ value: p.id, label: `${p.name} (${p.interval}) — ${p.credits.toLocaleString()} credits` })),
+  ];
+
+  return (
+    <Modal
+      open
+      onOpenChange={(v) => { if (!v) onClose(); }}
+      title="Create Tenant Credits"
+      description="Set up a new tenant with a plan and opening credit balance."
+      size="sm"
+      footer={
+        <div className="flex w-full items-center justify-between">
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button leftIcon={<Building2 className="size-4" />} onClick={handleCreate}>Create Tenant</Button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+
+        {/* Tenant name */}
+        <FormField label="Tenant Name" required error={nameError}>
+          {({ id, describedBy, invalid }) => (
+            <TextInput id={id} aria-describedby={describedBy} invalid={invalid}
+              placeholder="e.g. Acme Corporation" value={name}
+              onChange={e => { setName(e.target.value); if (e.target.value) setNameError(''); }} />
+          )}
+        </FormField>
+
+        {/* Plan */}
+        <FormField label="Plan">
+          {({ id }) => (
+            <SelectInput id={id} value={planId} options={planOptions}
+              onChange={e => setPlanId(e.target.value)} />
+          )}
+        </FormField>
+
+        {/* Allocation info — only when a plan is chosen */}
+        {selectedPlan && (
+          <div className="flex items-center gap-2 rounded-lg bg-[#EBF3FF] px-3 py-2 text-xs text-[#1254C7]">
+            <Info className="size-3.5 shrink-0" />
+            <span>
+              <span className="font-semibold">{selectedPlan.credits.toLocaleString()} credits</span>
+              {' '}allocated immediately · next {selectedPlan.interval.toLowerCase()} on{' '}
+              <span className="font-semibold">{selectedPlan.interval === 'Monthly' ? '01 Nov 2026' : '01 Oct 2027'}</span>
+            </span>
+          </div>
+        )}
+
+        {/* Rollover */}
+        <div className="flex items-center justify-between">
+          <label htmlFor="rollover-switch" className="text-[13px] font-semibold text-[#374151] cursor-pointer">
+            Rollover unused credits
+          </label>
+          <Switch id="rollover-switch" checked={rollover} onCheckedChange={setRollover} />
+        </div>
+
+        <div className="h-px bg-[#F3F4F6]" />
+
+        {/* Top-up */}
+        <FormField label="Top-up Credits" hint="Optional — added immediately on top of plan allocation.">
+          {({ id }) => (
+            <TextInput id={id} type="number" min={0} placeholder="e.g. 500"
+              value={topUp} onChange={e => { setTopUp(e.target.value); if (!e.target.value) setRefError(''); }} />
+          )}
+        </FormField>
+
+        {extraCredits > 0 && (
+          <FormField label="Reference" required error={refError}>
+            {({ id, describedBy, invalid }) => (
+              <TextInput id={id} aria-describedby={describedBy} invalid={invalid}
+                placeholder="e.g. REF-20261022"
+                value={reference} onChange={e => { setReference(e.target.value); if (e.target.value) setRefError(''); }} />
+            )}
+          </FormField>
+        )}
+
+        {/* Opening balance summary */}
+        <div className="flex items-center justify-between rounded-lg bg-[#F9FAFB] border border-[#E5E7EB] px-4 py-3">
+          <span className="text-[13px] font-semibold text-[#374151]">Opening balance</span>
+          <span className="text-base font-bold text-[#1565F0] tabular-nums">
+            {openingBalance.toLocaleString()} <span className="text-xs font-semibold text-[#6B7280]">credits</span>
+          </span>
+        </div>
+
+      </div>
+    </Modal>
+  );
+}
+
+// ── Edit Tenant Modal ─────────────────────────────────────────────────────────
+function EditTenantModal({ tenant, onClose, onSave }: { tenant: TenantCredit; onClose: () => void; onSave: (updated: TenantCredit) => void }) {
+  const [name, setName] = useState(tenant.name);
+  const [nameError, setNameError] = useState('');
+
+  function handleSave() {
+    if (!name.trim()) { setNameError('Tenant name is required'); return; }
+    onSave({ ...tenant, name: name.trim() });
+    onClose();
+  }
+
+  return (
+    <Modal open onOpenChange={(v) => { if (!v) onClose(); }} title="Edit Tenant" size="sm"
+      footer={
+        <div className="flex w-full items-center justify-between">
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSave}>Save Changes</Button>
+        </div>
+      }>
+      <FormField label="Tenant Name" required error={nameError}>
+        {({ id, describedBy, invalid }) => (
+          <TextInput id={id} aria-describedby={describedBy} invalid={invalid}
+            value={name} onChange={e => { setName(e.target.value); if (e.target.value) setNameError(''); }}
+            placeholder="e.g. Acme Corporation" />
+        )}
+      </FormField>
+    </Modal>
+  );
+}
 
 // ── Change Plan Modal ──────────────────────────────────────────────────────────
 function ChangePlanModal({ tenant, onClose }: { tenant: TenantCredit; onClose: () => void }) {
@@ -171,12 +341,16 @@ const STATUS_LABELS: Record<CreditStatus, string> = {
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function TenantCreditPage() {
-  const [tenants] = useState<TenantCredit[]>(MOCK_TENANTS);
+  const { role } = useRole();
+  const isSiteAdmin = role === 'site-admin';
+  const [tenants, setTenants] = useState<TenantCredit[]>(MOCK_TENANTS);
+  const [showCreate, setShowCreate] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<CreditStatus[]>([]);
   const [needsAttention, setNeedsAttention] = useState(false);
   const [tenantStatusFilter, setTenantStatusFilter] = useState<'all' | 'active' | 'suspended'>('active');
   const [page, setPage] = useState(1);
+  const [editTenant, setEditTenant] = useState<TenantCredit | null>(null);
   const [changePlanTenant, setChangePlanTenant] = useState<TenantCredit | null>(null);
   const [topUpTenant, setTopUpTenant] = useState<TenantCredit | null>(null);
   const [historyTenant, setHistoryTenant] = useState<TenantCredit | null>(null);
@@ -211,7 +385,12 @@ export default function TenantCreditPage() {
       <PageHeader
         title="AI Credit Management"
         actions={
-          <Button variant="secondary" leftIcon={<Download className="size-4" />}>Export CSV</Button>
+          <div className="flex items-center gap-2">
+            {isSiteAdmin && (
+              <Button variant="secondary" leftIcon={<Download className="size-4" />}>Export CSV</Button>
+            )}
+            <Button leftIcon={<Plus className="size-4" />} onClick={() => setShowCreate(true)}>Create Tenant</Button>
+          </div>
         }
       />
 
@@ -383,6 +562,7 @@ export default function TenantCreditPage() {
               key: 'actions' as keyof TenantCredit, header: '', align: 'right',
               cell: r => {
                 const suspended = r.tenantStatus === 'suspended';
+                if (!isSiteAdmin) return null;
                 return (
                   <div className="flex items-center justify-end gap-1.5">
                     <Tooltip content={suspended ? 'Unavailable for suspended tenants' : 'Add credits to this tenant'}>
@@ -398,10 +578,14 @@ export default function TenantCreditPage() {
                           icon={<MoreHorizontal className="size-4" />} />
                       }
                       items={[
-                        { type: 'label', label: 'Actions' },
-                        { label: 'Change Plan', disabled: suspended, onSelect: () => setChangePlanTenant(r) },
+                        { label: 'Edit', icon: <Pencil />, onSelect: () => setEditTenant(r) },
+                        { label: 'Change Plan', icon: <ChevronDown />, disabled: suspended, onSelect: () => setChangePlanTenant(r) },
                         { label: 'View Dashboard', onSelect: () => setMonitorTenant(r) },
                         { label: 'Transaction History', onSelect: () => setHistoryTenant(r) },
+                        { type: 'separator' },
+                        suspended
+                          ? { label: 'Activate', icon: <Power />, onSelect: () => setTenants(prev => prev.map(t => t.id === r.id ? { ...t, tenantStatus: 'active' } : t)) }
+                          : { label: 'Deactivate', icon: <PowerOff />, destructive: true, onSelect: () => setTenants(prev => prev.map(t => t.id === r.id ? { ...t, tenantStatus: 'suspended' } : t)) },
                       ]}
                     />
                   </div>
@@ -417,6 +601,19 @@ export default function TenantCreditPage() {
       </div>
 
       {/* Modals */}
+      {showCreate && (
+        <CreateTenantModal
+          onClose={() => setShowCreate(false)}
+          onCreated={(t) => setTenants(prev => [t, ...prev])}
+        />
+      )}
+      {editTenant && (
+        <EditTenantModal
+          tenant={editTenant}
+          onClose={() => setEditTenant(null)}
+          onSave={(updated) => setTenants(prev => prev.map(t => t.id === updated.id ? updated : t))}
+        />
+      )}
       {changePlanTenant && (
         <ChangePlanModal tenant={changePlanTenant} onClose={() => setChangePlanTenant(null)} />
       )}
