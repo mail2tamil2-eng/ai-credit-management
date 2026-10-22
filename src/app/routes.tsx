@@ -6,6 +6,8 @@ import { CoursesPage } from './pages/CoursesPage';
 import { AICreateCoursePage } from './pages/AICreateCoursePage';
 import AICreditLayout from './pages/AICreditLayout';
 import TenantCreditPage from './pages/TenantCreditPage';
+import CreditMonitoringPage from './pages/CreditMonitoringPage';
+import { RoleProvider } from './context/RoleContext';
 
 export const router = createBrowserRouter([
   {
@@ -15,7 +17,7 @@ export const router = createBrowserRouter([
       { path: 'courses/:courseId/translations', element: <TranslationsPage /> },
       {
         index: true,
-        element: <Navigate to="/dashboard" replace />,
+        element: <Navigate to="/ai-credits" replace />,
       },
       {
         path: 'dashboard',
@@ -33,9 +35,10 @@ export const router = createBrowserRouter([
   },
   {
     path: '/ai-credits',
-    element: <AICreditLayout />,
+    element: <RoleProvider><AICreditLayout /></RoleProvider>,
     children: [
       { index: true, element: <TenantCreditPage /> },
+      { path: 'monitoring', element: <CreditMonitoringPage /> },
     ],
   },
 ]);

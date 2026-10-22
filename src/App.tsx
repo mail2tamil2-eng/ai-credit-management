@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router';
-import { CreditCard, BookOpen, BarChart3, LayoutDashboard } from 'lucide-react';
+import { CreditCard, BookOpen, BarChart3 } from 'lucide-react';
 import logo from './imports/AXLE-Korp-LOGO__2_.jpg';
 import { AppHeader, AppSidebar } from './app/components/saas';
 import TenantCreditPage from './app/pages/TenantCreditPage';
@@ -9,7 +9,6 @@ import CreditMonitoringPage from './app/pages/CreditMonitoringPage';
 import OrgCreditDashboardPage from './app/pages/OrgCreditDashboardPage';
 
 const NAV_SITE_ADMIN = [
-  { id: '/dashboard', label: 'Overview',         icon: LayoutDashboard },
   { id: '/credits',   label: 'Tenant Credits',   icon: CreditCard },
   { id: '/plans',     label: 'Plan Management',  icon: BookOpen },
   { id: '/monitoring',label: 'Monitoring',       icon: BarChart3 },
@@ -31,7 +30,7 @@ function Layout() {
     <div className="flex h-screen bg-[#F9FAFB]" style={{ fontFamily: 'Nunito Sans, system-ui, sans-serif' }}>
       <AppSidebar
         groups={[
-          { title: role === 'site' ? 'Site Admin' : 'Organisation', items: nav },
+          { items: nav },
         ]}
         activeId={pathname}
         onNavigate={(id) => navigate(id)}
@@ -43,21 +42,7 @@ function Layout() {
             <img src={logo} alt="Axle KORP" className="size-full object-cover object-left" />
           </span>
         }
-        footer={
-          <div className="flex flex-col gap-2">
-            <div className="flex gap-1 rounded-lg bg-white/10 p-0.5">
-              <button onClick={() => { setRole('site'); navigate('/credits'); }}
-                className={`flex-1 rounded-md py-1 text-xs font-medium transition-all ${role === 'site' ? 'bg-white text-[#111827] shadow-sm' : 'text-white/70 hover:text-white'}`}>
-                Site Admin
-              </button>
-              <button onClick={() => { setRole('org'); navigate('/org-credits'); }}
-                className={`flex-1 rounded-md py-1 text-xs font-medium transition-all ${role === 'org' ? 'bg-white text-[#111827] shadow-sm' : 'text-white/70 hover:text-white'}`}>
-                Org Admin
-              </button>
-            </div>
-            <p className="text-center text-xs opacity-60">Powered by NOVACTECH</p>
-          </div>
-        }
+        footer={<>Powered by <b>NOVACTECH</b></>}
         footerCollapsed={<b>NT</b>}
       />
 

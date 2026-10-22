@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, AlertTriangle, Users, ShieldOff, Activity, MoreHorizontal, ChevronDown, X, Plus, Check, Building2, Info, Pencil, PowerOff, Power } from 'lucide-react';
+import { Download, AlertTriangle, Users, ShieldOff, Activity, MoreHorizontal, ChevronDown, X, Plus, Building2, Info, Pencil, PowerOff, Power } from 'lucide-react';
 import {
   Button, DataTable, Pagination, Modal, FormField, SearchBar,
   Tooltip, PageHeader, StatWidget, DropdownMenu, IconButton, TextInput, TextArea, SelectInput,
@@ -11,6 +11,7 @@ import { MOCK_TENANTS, MOCK_PLANS } from './creditTypes';
 import CreditTransactionHistory from './CreditTransactionHistory';
 import { CreditMonitoringContent } from './CreditMonitoringPage';
 import { useRole } from '../context/RoleContext';
+
 
 // ── Create Tenant Modal ────────────────────────────────────────────────────────
 function CreateTenantModal({ onClose, onCreated }: { onClose: () => void; onCreated: (t: TenantCredit) => void }) {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { TrendingUp, Zap, Layers, Users, AlertTriangle, CheckCircle2, ShieldOff, ArrowLeft } from 'lucide-react';
-import { Button, StatWidget, PageHeader, SearchBar } from '../components/saas';
+import { TrendingUp, Zap, Layers, Users, AlertTriangle, CheckCircle2, ShieldOff, ArrowLeft, LayoutGrid, PanelLeftOpen } from 'lucide-react';
+import { Button, StatWidget, PageHeader, SearchBar, Pagination } from '../components/saas';
 import { CreditStatusBadge } from '../components/CreditStatusBadge';
 import type { TenantCredit, CreditStatus } from './creditTypes';
 import { MOCK_TENANTS, MOCK_TRANSACTIONS } from './creditTypes';
@@ -14,31 +14,40 @@ const PLAN_MAX: Record<string, number> = {
   Starter: 2000, Growth: 5000, Pro: 10000, Enterprise: 150000,
 };
 
-function CreditGauge({ balance, plan, status }: { balance: number; plan?: string; status: CreditStatus }) {
+function CreditGauge({ balance, plan, status, size = 'lg' }: {
+  balance: number; plan?: string; status: CreditStatus; size?: 'sm' | 'lg';
+}) {
   const max = PLAN_MAX[plan?.split(' ')[0] ?? ''] ?? 5000;
   const pct = Math.max(0, Math.min(100, max > 0 ? (balance / max) * 100 : 0));
   const color = GAUGE_COLORS[status];
-  const circumference = 2 * Math.PI * 54;
+  const r = size === 'sm' ? 36 : 54;
+  const sw = size === 'sm' ? 9 : 14;
+  const dim = size === 'sm' ? 96 : 128;
+  const circumference = 2 * Math.PI * r;
   const offset = circumference * (1 - pct / 100);
 
   return (
     <div className="flex flex-col items-center">
-      <div className="relative size-40">
-        <svg className="size-full -rotate-90" viewBox="0 0 128 128">
-          <circle cx="64" cy="64" r="54" fill="none" stroke="#F3F4F6" strokeWidth="14" />
-          <circle cx="64" cy="64" r="54" fill="none" stroke={color} strokeWidth="14"
+      <div className="relative" style={{ width: dim, height: dim }}>
+        <svg className="size-full -rotate-90" viewBox={`0 0 ${dim} ${dim}`}>
+          <circle cx={dim / 2} cy={dim / 2} r={r} fill="none" stroke="#F3F4F6" strokeWidth={sw} />
+          <circle cx={dim / 2} cy={dim / 2} r={r} fill="none" stroke={color} strokeWidth={sw}
             strokeDasharray={circumference} strokeDashoffset={offset}
             strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.6s ease' }} />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5">
-          <span className="text-xl font-bold text-[#111827] tabular-nums leading-none">
-            {balance.toLocaleString()}
+          <span className={`font-bold text-[#111827] tabular-nums leading-none ${size === 'sm' ? 'text-sm' : 'text-xl'}`}>
+            {balance < 0 ? balance.toLocaleString() : balance.toLocaleString()}
           </span>
-          <span className="text-[11px] text-[#9CA3AF]">credits</span>
-          <span className="text-xs font-semibold mt-0.5" style={{ color }}>{pct.toFixed(0)}%</span>
+          <span className={`text-[#9CA3AF] ${size === 'sm' ? 'text-[9px]' : 'text-[11px]'}`}>credits</span>
+          <span className={`font-semibold mt-0.5 ${size === 'sm' ? 'text-[9px]' : 'text-xs'}`} style={{ color }}>
+            {pct.toFixed(0)}%
+          </span>
         </div>
       </div>
-      <p className="mt-1.5 text-xs text-[#9CA3AF]">of {max.toLocaleString()} allocated</p>
+      {size === 'lg' && (
+        <p className="mt-1.5 text-xs text-[#9CA3AF]">of {max.toLocaleString()} allocated</p>
+      )}
     </div>
   );
 }
@@ -132,9 +141,7 @@ export function CreditMonitoringContent({ tenant }: { tenant: TenantCredit }) {
           <div className="flex flex-wrap items-center gap-2">
             <CreditStatusBadge status={tenant.creditStatus} />
             {tenant.tenantStatus === 'suspended' && (
-              <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500">
-                Suspended
-              </span>
+              <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500">Suspended</span>
             )}
           </div>
           <div className="space-y-2 text-sm">
@@ -181,24 +188,90 @@ function InfoRow({ label, value, valueClass }: { label: string; value: string; v
   );
 }
 
-// ── Tenant list item ──────────────────────────────────────────────────────────
+// ── Tenant Card (Overview grid) ───────────────────────────────────────────────
+function TenantCard({ tenant, onClick }: { tenant: TenantCredit; onClick: () => void }) {
+  const max = PLAN_MAX[tenant.plan?.split(' ')[0] ?? ''] ?? 5000;
+  const used = Math.max(0, max - tenant.balance);
+  const usedPct = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0;
+  const color = GAUGE_COLORS[tenant.creditStatus];
+
+  return (
+    <button
+      onClick={onClick}
+      className="w-full rounded-2xl border border-gray-100 bg-white p-5 text-left shadow-sm transition-all hover:border-[#1565F0] hover:shadow-md group"
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2 mb-4">
+        <div className="min-w-0">
+          <p className="truncate font-semibold text-[#111827] text-sm group-hover:text-[#1565F0] transition-colors">
+            {tenant.name}
+          </p>
+          <p className="text-[11px] text-[#9CA3AF] mt-0.5">
+            {tenant.plan?.split(' ')[0] ?? 'No plan'}
+            {tenant.tenantStatus === 'suspended' && (
+              <span className="ml-1.5 rounded bg-gray-100 px-1 py-0.5 text-[10px] font-semibold text-gray-500">Suspended</span>
+            )}
+          </p>
+        </div>
+        <CreditStatusBadge status={tenant.creditStatus} />
+      </div>
+
+      {/* Gauge */}
+      <div className="flex items-center gap-4">
+        <CreditGauge balance={tenant.balance} plan={tenant.plan} status={tenant.creditStatus} size="sm" />
+        <div className="flex-1 space-y-2.5">
+          <div>
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="text-[#6B7280]">Used</span>
+              <span className="font-semibold tabular-nums" style={{ color }}>{usedPct}%</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-[#F3F4F6]">
+              <div className="h-full rounded-full transition-all duration-500" style={{ width: `${usedPct}%`, background: color }} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+            <div>
+              <p className="text-[#9CA3AF]">Balance</p>
+              <p className={`font-bold tabular-nums ${tenant.balance < 0 ? 'text-red-600' : 'text-[#111827]'}`}>
+                {tenant.balance.toLocaleString()}
+              </p>
+            </div>
+            <div>
+              <p className="text-[#9CA3AF]">Next alloc.</p>
+              <p className="font-semibold text-[#374151]">{tenant.nextAllocation ?? '—'}</p>
+            </div>
+            <div>
+              <p className="text-[#9CA3AF]">Allocation</p>
+              <p className={`font-semibold ${tenant.allocationStatus === 'active' ? 'text-green-700' : 'text-gray-400'}`}>
+                {tenant.allocationStatus === 'active' ? 'Active' : 'Inactive'}
+              </p>
+            </div>
+            <div>
+              <p className="text-[#9CA3AF]">Allocated</p>
+              <p className="font-semibold text-[#374151]">{max.toLocaleString()}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p className="mt-3 text-[11px] text-[#1565F0] font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+        View full details →
+      </p>
+    </button>
+  );
+}
+
+// ── Tenant list item (Detail view sidebar) ────────────────────────────────────
 function TenantListItem({ tenant, selected, onClick }: {
-  tenant: TenantCredit;
-  selected: boolean;
-  onClick: () => void;
+  tenant: TenantCredit; selected: boolean; onClick: () => void;
 }) {
-  // Red only for a genuine financial exception (balance below zero).
-  // All other credit-health states are already communicated by the badge;
-  // coloring the balance amber/orange on top adds visual noise without
-  // new information and fails WCAG AA (amber-600 on white = 3.0:1).
   const balanceColor =
-    tenant.balance < 0  ? 'text-red-600'     // negative: financial exception
-    : tenant.balance === 0 ? 'text-[#4B5563]' // exhausted: muted, badge carries the meaning
-    : 'text-[#374151]';                        // positive: dark neutral
+    tenant.balance < 0 ? 'text-red-600'
+    : tenant.balance === 0 ? 'text-[#4B5563]'
+    : 'text-[#374151]';
 
   return (
     <div className="relative">
-      {/* Left accent — contained inside wrapper, never overflows */}
       {selected && (
         <span aria-hidden className="pointer-events-none absolute left-0 top-1 bottom-1 w-[3px] rounded-full bg-[#1565F0]" />
       )}
@@ -211,15 +284,10 @@ function TenantListItem({ tenant, selected, onClick }: {
           selected ? 'bg-[#EBF3FF]' : 'hover:bg-[#F3F4F6]',
         ].join(' ')}
       >
-        {/* Row 1 — name + status badge */}
         <div className="flex items-center justify-between gap-2">
-          {/* Name stays dark regardless of selection — blue-on-EBF3FF fails WCAG AA (4.2:1) */}
-          <p className="min-w-0 truncate text-sm font-semibold text-[#111827]">
-            {tenant.name}
-          </p>
+          <p className="min-w-0 truncate text-sm font-semibold text-[#111827]">{tenant.name}</p>
           <CreditStatusBadge status={tenant.creditStatus} />
         </div>
-        {/* Row 2 — plan name + balance + suspended chip */}
         <div className="mt-1 flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-1.5">
             <p className="min-w-0 truncate text-[11px] text-[#9CA3AF]">
@@ -240,10 +308,17 @@ function TenantListItem({ tenant, selected, onClick }: {
   );
 }
 
+const PAGE_SIZE_OPTIONS = [8, 12, 24, 48];
+
 // ── Full Page ─────────────────────────────────────────────────────────────────
+type ViewMode = 'overview' | 'detail';
+
 export default function CreditMonitoringPage() {
+  const [view, setView] = useState<ViewMode>('overview');
   const [selected, setSelected] = useState<TenantCredit>(MOCK_TENANTS[0]);
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(8);
 
   const healthy   = MOCK_TENANTS.filter(t => t.creditStatus === 'active').length;
   const atRisk    = MOCK_TENANTS.filter(t => ['low', 'critical', 'exhausted', 'negative'].includes(t.creditStatus)).length;
@@ -252,54 +327,147 @@ export default function CreditMonitoringPage() {
   const filteredTenants = MOCK_TENANTS.filter(t =>
     !search || t.name.toLowerCase().includes(search.toLowerCase())
   );
+  const pagedTenants = filteredTenants.slice((page - 1) * pageSize, page * pageSize);
+  const totalPages = Math.ceil(filteredTenants.length / pageSize);
+
+  function handleSearch(v: string) {
+    setSearch(v);
+    setPage(1);
+  }
+
+  function openDetail(tenant: TenantCredit) {
+    setSelected(tenant);
+    setView('detail');
+  }
 
   return (
-    <div className="flex h-full flex-col gap-6 px-8 py-6">
-      <PageHeader title="Credit Monitoring" />
+    <div className="px-8 py-6 space-y-6">
+      {/* Header */}
+      <PageHeader
+        title="Credit Monitoring"
+        actions={
+          <div className="flex items-center gap-1 rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+            <button
+              onClick={() => setView('overview')}
+              className={[
+                'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all',
+                view === 'overview' ? 'bg-white text-[#111827] shadow-sm' : 'text-gray-500 hover:text-gray-700',
+              ].join(' ')}
+            >
+              <LayoutGrid className="size-3.5" /> All Tenants
+            </button>
+            <button
+              onClick={() => setView('detail')}
+              className={[
+                'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all',
+                view === 'detail' ? 'bg-white text-[#111827] shadow-sm' : 'text-gray-500 hover:text-gray-700',
+              ].join(' ')}
+            >
+              <PanelLeftOpen className="size-3.5" /> Detail View
+            </button>
+          </div>
+        }
+      />
 
       {/* System-wide KPIs */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatWidget label="Total Tenants"   value={MOCK_TENANTS.length} icon={Users}        tone="blue" />
-        <StatWidget label="Healthy"         value={healthy}             icon={CheckCircle2} tone="green"  hint="Credits above threshold" />
-        <StatWidget label="Needs Attention" value={atRisk}              icon={AlertTriangle} tone="amber" hint={atRisk > 0 ? 'Low, critical or exhausted' : 'None'} />
-        <StatWidget label="Suspended"       value={suspended}           icon={ShieldOff}    tone="orange" />
+        <StatWidget label="Total Tenants"   value={MOCK_TENANTS.length} icon={Users}         tone="blue" />
+        <StatWidget label="Healthy"         value={healthy}             icon={CheckCircle2}  tone="green"  hint="Credits above threshold" />
+        <StatWidget label="Needs Attention" value={atRisk}              icon={AlertTriangle}  tone="amber" hint={atRisk > 0 ? 'Low, critical or exhausted' : 'None'} />
+        <StatWidget label="Suspended"       value={suspended}           icon={ShieldOff}     tone="orange" />
       </div>
 
-      {/* Two-column layout */}
-      <div className="flex min-h-0 flex-1 gap-5">
+      {/* Search + count */}
+      <div className="flex items-center gap-4">
+        <div className="max-w-sm flex-1">
+          <SearchBar value={search} onChange={handleSearch} placeholder="Find tenant…" />
+        </div>
+        <span className="text-sm text-[#9CA3AF] tabular-nums shrink-0">
+          {filteredTenants.length} of {MOCK_TENANTS.length} tenants
+        </span>
+      </div>
 
-        {/* Left — tenant list (wider so badges don't clip) */}
-        <div className="flex w-80 shrink-0 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-          <div className="border-b border-gray-100 p-3">
-            <SearchBar value={search} onChange={setSearch} placeholder="Find tenant…" />
-          </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
-            {filteredTenants.length === 0 && (
-              <p className="px-4 py-8 text-center text-sm text-[#9CA3AF]">No tenants found</p>
+      {/* ── Overview: paginated tenant cards ── */}
+      {view === 'overview' && (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {pagedTenants.length === 0 && (
+              <p className="col-span-full py-12 text-center text-sm text-[#9CA3AF]">No tenants found</p>
             )}
-            {filteredTenants.map(t => (
-              <TenantListItem key={t.id} tenant={t}
-                selected={selected.id === t.id}
-                onClick={() => setSelected(t)} />
+            {pagedTenants.map(t => (
+              <TenantCard key={t.id} tenant={t} onClick={() => openDetail(t)} />
             ))}
           </div>
-        </div>
 
-        {/* Right — detail panel */}
-        <div className="flex-1 overflow-y-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
-          <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-4">
-            <div>
-              <h2 className="text-base font-bold text-[#111827]">{selected.name}</h2>
-              <p className="text-xs text-[#9CA3AF]">{selected.plan ?? 'No plan assigned'}</p>
+          {/* Pagination controls */}
+          {filteredTenants.length > 0 && (
+            <div className="flex items-center justify-between border-t border-gray-100 pt-4">
+              <div className="flex items-center gap-2 text-sm text-[#6B7280]">
+                <span>Show</span>
+                <select
+                  value={pageSize}
+                  onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
+                  className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm text-[#374151] focus:outline-none focus:ring-2 focus:ring-[#1565F0]"
+                >
+                  {PAGE_SIZE_OPTIONS.map(n => (
+                    <option key={n} value={n}>{n} per page</option>
+                  ))}
+                </select>
+                <span className="text-[#9CA3AF]">
+                  · showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filteredTenants.length)} of {filteredTenants.length}
+                </span>
+              </div>
+              {totalPages > 1 && (
+                <Pagination
+                  page={page}
+                  pageSize={pageSize}
+                  total={filteredTenants.length}
+                  onPageChange={setPage}
+                  itemLabel="tenants"
+                />
+              )}
             </div>
-            <CreditStatusBadge status={selected.creditStatus} />
+          )}
+        </>
+      )}
+
+      {/* ── Detail: master-detail layout ── */}
+      {view === 'detail' && (
+        <div className="flex min-h-[600px] gap-5">
+          {/* Left — tenant list */}
+          <div className="flex w-72 shrink-0 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+            <div className="border-b border-gray-100 p-3">
+              <p className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-[#9CA3AF]">
+                {filteredTenants.length} tenants
+              </p>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+              {filteredTenants.length === 0 && (
+                <p className="px-4 py-8 text-center text-sm text-[#9CA3AF]">No tenants found</p>
+              )}
+              {filteredTenants.map(t => (
+                <TenantListItem key={t.id} tenant={t}
+                  selected={selected.id === t.id}
+                  onClick={() => setSelected(t)} />
+              ))}
+            </div>
           </div>
-          <div className="p-6">
-            <CreditMonitoringContent key={selected.id} tenant={selected} />
+
+          {/* Right — detail panel */}
+          <div className="flex-1 overflow-y-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-4">
+              <div>
+                <h2 className="text-base font-bold text-[#111827]">{selected.name}</h2>
+                <p className="text-xs text-[#9CA3AF]">{selected.plan ?? 'No plan assigned'}</p>
+              </div>
+              <CreditStatusBadge status={selected.creditStatus} />
+            </div>
+            <div className="p-6">
+              <CreditMonitoringContent key={selected.id} tenant={selected} />
+            </div>
           </div>
         </div>
-
-      </div>
+      )}
     </div>
   );
 }
