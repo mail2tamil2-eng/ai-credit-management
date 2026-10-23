@@ -312,7 +312,6 @@ const PAGE_SIZE_OPTIONS = [8, 12, 24, 48];
 
 // ── Full Page ─────────────────────────────────────────────────────────────────
 type ViewMode = 'overview' | 'detail';
-const PAGE_SIZE_OPTIONS = [8, 12, 24, 48];
 
 export default function CreditMonitoringPage() {
   const [view, setView] = useState<ViewMode>('overview');
