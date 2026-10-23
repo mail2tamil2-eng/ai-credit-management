@@ -46,6 +46,17 @@ export interface ActionRecord {
   reason?: string;
 }
 
+export const AVAILABLE_TENANTS = [
+  'Pinnacle Education',
+  'TechBridge Academy',
+  'CloudLearn Institute',
+  'Momentum Skills',
+  'Nexus Learning',
+  'Horizon Training',
+  'BlueRidge Institute',
+  'Catalyst Academy',
+];
+
 export const MOCK_PLANS: Plan[] = [
   { id: 'p1', name: 'Starter', interval: 'Monthly', credits: 2000, description: 'For small teams', status: 'active', assignedTenants: 3 },
   { id: 'p2', name: 'Growth', interval: 'Monthly', credits: 5000, description: 'For growing organisations', status: 'active', assignedTenants: 5 },

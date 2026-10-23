@@ -3,7 +3,7 @@ import {
   Globe, Settings, Pencil,
   Upload, Play, Save, PanelRightOpen, Layout,
 } from 'lucide-react';
-import { ThemePopover, ThemeSettings } from './ThemePopover';
+import { ThemePopover, type ThemeSettings } from './ThemePopover';
 import { TemplatePopover } from './TemplatePopover';
 
 interface EditorTopToolbarProps {

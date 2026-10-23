@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
-import { Toaster as Sonner, toast as sonnerToast, type ToasterProps } from 'sonner';
+import { Toaster as Sonner, toast as sonnerToast } from 'sonner';
+import type { ComponentProps } from 'react';
+type ToasterProps = ComponentProps<typeof Sonner>;
 import { AlertTriangle, CheckCircle2, Info, Loader2, XCircle } from 'lucide-react';
 
 /** Mount once near the app root (App.tsx already mounts ui/sonner's Toaster). */

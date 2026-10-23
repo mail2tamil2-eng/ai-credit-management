@@ -147,7 +147,7 @@ export function CreditMonitoringContent({ tenant }: { tenant: TenantCredit }) {
           <div className="space-y-2 text-sm">
             <InfoRow label="Current Plan" value={tenant.plan ?? '—'} />
             <InfoRow label="Next Allocation" value={tenant.nextAllocation ?? '—'} />
-            <InfoRow label="Allocation"
+            <InfoRow label="Allocation Status"
               value={tenant.allocationStatus === 'active' ? 'Active' : 'Inactive'}
               valueClass={tenant.allocationStatus === 'active' ? 'text-green-700 font-semibold' : 'text-gray-500'} />
           </div>
@@ -241,7 +241,7 @@ function TenantCard({ tenant, onClick }: { tenant: TenantCredit; onClick: () => 
               <p className="font-semibold text-[#374151]">{tenant.nextAllocation ?? '—'}</p>
             </div>
             <div>
-              <p className="text-[#9CA3AF]">Allocation</p>
+              <p className="text-[#9CA3AF]">Allocation Status</p>
               <p className={`font-semibold ${tenant.allocationStatus === 'active' ? 'text-green-700' : 'text-gray-400'}`}>
                 {tenant.allocationStatus === 'active' ? 'Active' : 'Inactive'}
               </p>
@@ -312,6 +312,7 @@ const PAGE_SIZE_OPTIONS = [8, 12, 24, 48];
 
 // ── Full Page ─────────────────────────────────────────────────────────────────
 type ViewMode = 'overview' | 'detail';
+const PAGE_SIZE_OPTIONS = [8, 12, 24, 48];
 
 export default function CreditMonitoringPage() {
   const [view, setView] = useState<ViewMode>('overview');
@@ -371,10 +372,10 @@ export default function CreditMonitoringPage() {
 
       {/* System-wide KPIs */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatWidget label="Total Tenants"   value={MOCK_TENANTS.length} icon={Users}         tone="blue" />
-        <StatWidget label="Healthy"         value={healthy}             icon={CheckCircle2}  tone="green"  hint="Credits above threshold" />
-        <StatWidget label="Needs Attention" value={atRisk}              icon={AlertTriangle}  tone="amber" hint={atRisk > 0 ? 'Low, critical or exhausted' : 'None'} />
-        <StatWidget label="Suspended"       value={suspended}           icon={ShieldOff}     tone="orange" />
+        <StatWidget label="Total Tenants"   value={MOCK_TENANTS.length} icon={Users}        tone="blue" />
+        <StatWidget label="Healthy"         value={healthy}             icon={CheckCircle2} tone="green"  hint="Credits above threshold" />
+        <StatWidget label="Needs Attention" value={atRisk}              icon={AlertTriangle} tone="amber" hint={atRisk > 0 ? 'Low, critical or exhausted' : 'None'} />
+        <StatWidget label="Suspended"       value={suspended}           icon={ShieldOff}    tone="orange" />
       </div>
 
       {/* Search + count */}
@@ -399,7 +400,6 @@ export default function CreditMonitoringPage() {
             ))}
           </div>
 
-          {/* Pagination controls */}
           {filteredTenants.length > 0 && (
             <div className="flex items-center justify-between border-t border-gray-100 pt-4">
               <div className="flex items-center gap-2 text-sm text-[#6B7280]">
@@ -417,14 +417,9 @@ export default function CreditMonitoringPage() {
                   · showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filteredTenants.length)} of {filteredTenants.length}
                 </span>
               </div>
-              {totalPages > 1 && (
-                <Pagination
-                  page={page}
-                  pageSize={pageSize}
-                  total={filteredTenants.length}
-                  onPageChange={setPage}
-                  itemLabel="tenants"
-                />
+              {Math.ceil(filteredTenants.length / pageSize) > 1 && (
+                <Pagination page={page} pageSize={pageSize} total={filteredTenants.length}
+                  onPageChange={setPage} itemLabel="tenants" />
               )}
             </div>
           )}
@@ -434,7 +429,6 @@ export default function CreditMonitoringPage() {
       {/* ── Detail: master-detail layout ── */}
       {view === 'detail' && (
         <div className="flex min-h-[600px] gap-5">
-          {/* Left — tenant list */}
           <div className="flex w-72 shrink-0 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
             <div className="border-b border-gray-100 p-3">
               <p className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-[#9CA3AF]">
@@ -453,7 +447,6 @@ export default function CreditMonitoringPage() {
             </div>
           </div>
 
-          {/* Right — detail panel */}
           <div className="flex-1 overflow-y-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-4">
               <div>

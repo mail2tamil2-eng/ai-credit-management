@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router';
 import { BookOpen, CreditCard, BarChart3, ShieldCheck, UserCog, ChevronDown, Check } from 'lucide-react';
 import { AppHeader, AppSidebar } from '../components/saas';
+import { Toaster } from '../components/ui/sonner';
 import { useRole, ROLE_LABELS } from '../context/RoleContext';
 import type { AppRole } from '../context/RoleContext';
 import logo from '../../imports/AXLE-Korp-LOGO__2_.jpg';
@@ -9,6 +10,7 @@ import axleMark from '../../imports/axle-mark.svg';
 
 const NAV_ROUTES: Record<string, string> = {
   credits: '/ai-credits',
+  plans: '/ai-credits/plans',
   monitoring: '/ai-credits/monitoring',
 };
 
@@ -73,12 +75,14 @@ export default function AICreditLayout() {
 
   const activeId = location.pathname.startsWith('/ai-credits/monitoring')
     ? 'monitoring'
+    : location.pathname.startsWith('/ai-credits/plans')
+    ? 'plans'
     : 'credits';
 
   // Credit managers don't have Tenant Credits access — redirect to monitoring
   useEffect(() => {
     if (isCreditManager && location.pathname === '/ai-credits') {
-      navigate('/ai-credits/monitoring', { replace: true });
+      navigate('/ai-credits/plans', { replace: true });
     }
   }, [isCreditManager, location.pathname, navigate]);
 
@@ -93,9 +97,8 @@ export default function AICreditLayout() {
         { id: 'monitoring', label: 'Monitoring', icon: BarChart3 },
       ]
     : [
-        { id: 'credits', label: 'Tenant Credits', icon: CreditCard },
         { id: 'plans', label: 'Plan Management', icon: BookOpen },
-        { id: 'monitoring', label: 'Monitoring', icon: BarChart3 },
+        { id: 'credits', label: 'Tenant Credits', icon: CreditCard },
       ];
 
   return (
@@ -132,6 +135,8 @@ export default function AICreditLayout() {
       <main style={{ paddingTop: 80, marginLeft: sidebarW, transition: 'margin-left 200ms ease' }}>
         <Outlet />
       </main>
+
+      <Toaster position="top-right" richColors />
     </div>
   );
 }

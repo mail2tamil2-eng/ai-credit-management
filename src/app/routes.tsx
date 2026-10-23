@@ -7,6 +7,7 @@ import { AICreateCoursePage } from './pages/AICreateCoursePage';
 import AICreditLayout from './pages/AICreditLayout';
 import TenantCreditPage from './pages/TenantCreditPage';
 import CreditMonitoringPage from './pages/CreditMonitoringPage';
+import PlanManagementPage from './pages/PlanManagementPage';
 import { RoleProvider } from './context/RoleContext';
 
 export const router = createBrowserRouter([
@@ -38,6 +39,7 @@ export const router = createBrowserRouter([
     element: <RoleProvider><AICreditLayout /></RoleProvider>,
     children: [
       { index: true, element: <TenantCreditPage /> },
+      { path: 'plans', element: <PlanManagementPage /> },
       { path: 'monitoring', element: <CreditMonitoringPage /> },
     ],
   },

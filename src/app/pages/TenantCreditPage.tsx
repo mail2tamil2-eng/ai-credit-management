@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Download, AlertTriangle, Users, ShieldOff, Activity, MoreHorizontal, ChevronDown, X, Plus, Building2, Info, Pencil, PowerOff, Power } from 'lucide-react';
+import { toast } from 'sonner';
+import { Download, AlertTriangle, Users, ShieldOff, Activity, ChevronDown, X, Plus, Building2, Info, Pencil, PowerOff, Power, ArrowLeftRight, LayoutDashboard, Clock, ArrowLeft } from 'lucide-react';
 import {
   Button, DataTable, Pagination, Modal, FormField, SearchBar,
   Tooltip, PageHeader, StatWidget, DropdownMenu, IconButton, TextInput, TextArea, SelectInput,
@@ -7,7 +8,7 @@ import {
 import { Switch } from '../components/ui/switch';
 import { CreditStatusBadge } from '../components/CreditStatusBadge';
 import type { TenantCredit, CreditStatus, Plan } from './creditTypes';
-import { MOCK_TENANTS, MOCK_PLANS } from './creditTypes';
+import { MOCK_TENANTS, MOCK_PLANS, AVAILABLE_TENANTS } from './creditTypes';
 import CreditTransactionHistory from './CreditTransactionHistory';
 import { CreditMonitoringContent } from './CreditMonitoringPage';
 import { useRole } from '../context/RoleContext';
@@ -22,6 +23,9 @@ function CreateTenantModal({ onClose, onCreated }: { onClose: () => void; onCrea
   const [reference, setReference] = useState('');
   const [nameError, setNameError] = useState('');
   const [refError, setRefError] = useState('');
+  const [lowThreshold, setLowThreshold] = useState('20');
+  const [criticalThreshold, setCriticalThreshold] = useState('10');
+  const [thresholdError, setThresholdError] = useState('');
 
   const activePlans = MOCK_PLANS.filter(p => p.status === 'active');
   const selectedPlan = activePlans.find(p => p.id === planId) ?? null;
@@ -29,12 +33,12 @@ function CreateTenantModal({ onClose, onCreated }: { onClose: () => void; onCrea
   const extraCredits = Number(topUp) || 0;
   const openingBalance = planCredits + extraCredits;
 
-  function deriveCreditStatus(balance: number, planCreds: number): CreditStatus {
+  function deriveCreditStatus(balance: number, planCreds: number, lowPct = 0.20, critPct = 0.10): CreditStatus {
     if (balance === 0) return 'exhausted';
     if (planCreds > 0) {
       const pct = balance / planCreds;
-      if (pct <= 0.05) return 'critical';
-      if (pct <= 0.20) return 'low';
+      if (pct <= critPct) return 'critical';
+      if (pct <= lowPct) return 'low';
     }
     return 'active';
   }
@@ -43,6 +47,14 @@ function CreateTenantModal({ onClose, onCreated }: { onClose: () => void; onCrea
     let valid = true;
     if (!name.trim()) { setNameError('Tenant name is required'); valid = false; }
     if (extraCredits > 0 && !reference.trim()) { setRefError('Reference is required for top-up'); valid = false; }
+    const lowVal = Number(lowThreshold);
+    const critVal = Number(criticalThreshold);
+    if (!lowVal || !critVal || critVal >= lowVal) {
+      setThresholdError('Critical threshold must be less than Low threshold');
+      valid = false;
+    } else {
+      setThresholdError('');
+    }
     if (!valid) return;
     const tenant: TenantCredit = {
       id: `T-${Date.now().toString(36).toUpperCase().slice(-6)}`,
@@ -53,7 +65,7 @@ function CreateTenantModal({ onClose, onCreated }: { onClose: () => void; onCrea
         ? (selectedPlan.interval === 'Monthly' ? '01 Nov 2026' : '01 Oct 2027')
         : undefined,
       balance: openingBalance,
-      creditStatus: deriveCreditStatus(openingBalance, planCredits),
+      creditStatus: deriveCreditStatus(openingBalance, planCredits, lowVal / 100, critVal / 100),
       allocationStatus: selectedPlan ? 'active' : 'inactive',
     };
     onCreated(tenant);
@@ -83,10 +95,16 @@ function CreateTenantModal({ onClose, onCreated }: { onClose: () => void; onCrea
 
         {/* Tenant name */}
         <FormField label="Tenant Name" required error={nameError}>
-          {({ id, describedBy, invalid }) => (
-            <TextInput id={id} aria-describedby={describedBy} invalid={invalid}
-              placeholder="e.g. Acme Corporation" value={name}
-              onChange={e => { setName(e.target.value); if (e.target.value) setNameError(''); }} />
+          {({ id }) => (
+            <SelectInput
+              id={id}
+              value={name}
+              options={[
+                { value: '', label: 'Select a tenant' },
+                ...AVAILABLE_TENANTS.map(t => ({ value: t, label: t })),
+              ]}
+              onChange={e => { setName(e.target.value); if (e.target.value) setNameError(''); }}
+            />
           )}
         </FormField>
 
@@ -116,6 +134,41 @@ function CreateTenantModal({ onClose, onCreated }: { onClose: () => void; onCrea
             Rollover unused credits
           </label>
           <Switch id="rollover-switch" checked={rollover} onCheckedChange={setRollover} />
+        </div>
+
+        <div className="h-px bg-[#F3F4F6]" />
+
+        {/* Credit alert thresholds */}
+        <div>
+          <div className="flex gap-3">
+            <FormField label="Low Credit Threshold">
+              {({ id }) => (
+                <div className="relative">
+                  <TextInput
+                    id={id} type="number" min={1} max={99}
+                    value={lowThreshold}
+                    onChange={e => { setLowThreshold(e.target.value); setThresholdError(''); }}
+                    style={{ paddingRight: '2rem' }}
+                  />
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-[#6B7280]">%</span>
+                </div>
+              )}
+            </FormField>
+            <FormField label="Critical Threshold">
+              {({ id }) => (
+                <div className="relative">
+                  <TextInput
+                    id={id} type="number" min={1} max={99}
+                    value={criticalThreshold}
+                    onChange={e => { setCriticalThreshold(e.target.value); setThresholdError(''); }}
+                    style={{ paddingRight: '2rem' }}
+                  />
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-[#6B7280]">%</span>
+                </div>
+              )}
+            </FormField>
+          </div>
+          {thresholdError && <p className="mt-1.5 text-xs text-red-600">{thresholdError}</p>}
         </div>
 
         <div className="h-px bg-[#F3F4F6]" />
@@ -349,13 +402,15 @@ export default function TenantCreditPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<CreditStatus[]>([]);
   const [needsAttention, setNeedsAttention] = useState(false);
-  const [tenantStatusFilter, setTenantStatusFilter] = useState<'all' | 'active' | 'suspended'>('active');
+  const [tenantStatusFilter, setTenantStatusFilter] = useState<'all' | 'active' | 'suspended'>('all');
   const [page, setPage] = useState(1);
   const [editTenant, setEditTenant] = useState<TenantCredit | null>(null);
   const [changePlanTenant, setChangePlanTenant] = useState<TenantCredit | null>(null);
   const [topUpTenant, setTopUpTenant] = useState<TenantCredit | null>(null);
   const [historyTenant, setHistoryTenant] = useState<TenantCredit | null>(null);
   const [monitorTenant, setMonitorTenant] = useState<TenantCredit | null>(null);
+  const [confirmToggleTenant, setConfirmToggleTenant] = useState<TenantCredit | null>(null);
+  const [detailTenant, setDetailTenant] = useState<TenantCredit | null>(null);
   const pageSize = 10;
 
   const attention: CreditStatus[] = ['low', 'critical', 'exhausted', 'negative'];
@@ -378,7 +433,22 @@ export default function TenantCreditPage() {
     setPage(1);
   }
 
-  const hasFilters = statusFilter.length > 0 || needsAttention || tenantStatusFilter !== 'active';
+  const hasFilters = statusFilter.length > 0 || needsAttention || tenantStatusFilter !== 'all';
+
+  if (detailTenant) {
+    return (
+      <div className="px-8 py-6 space-y-6">
+        <button
+          onClick={() => setDetailTenant(null)}
+          className="flex items-center gap-1.5 text-sm font-medium text-[#1565F0] hover:underline"
+        >
+          <ArrowLeft className="size-4" /> Back to Tenant Credits
+        </button>
+        <h2 className="text-xl font-bold text-[#111827]">{detailTenant.name}</h2>
+        <CreditMonitoringContent tenant={detailTenant} />
+      </div>
+    );
+  }
 
   return (
     <div className="px-8 py-6 space-y-6">
@@ -516,12 +586,12 @@ export default function TenantCreditPage() {
             {
               key: 'name', header: 'Tenant',
               cell: r => (
-                <div>
-                  <p className="font-semibold text-[#111827] text-sm">{r.name}</p>
+                <button className="text-left group" onClick={() => setDetailTenant(r)}>
+                  <p className="font-semibold text-[#111827] text-sm group-hover:text-[#1565F0] transition-colors">{r.name}</p>
                   <p className={`text-xs mt-0.5 ${r.tenantStatus === 'active' ? 'text-green-600' : 'text-gray-400'}`}>
                     {r.tenantStatus === 'active' ? 'Active account' : 'Suspended'}
                   </p>
-                </div>
+                </button>
               ),
             },
             {
@@ -551,7 +621,7 @@ export default function TenantCreditPage() {
               ),
             },
             {
-              key: 'allocationStatus', header: 'Allocation',
+              key: 'allocationStatus', header: 'Allocation Status',
               cell: r => (
                 <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${r.allocationStatus === 'active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                   <span className={`size-1.5 rounded-full ${r.allocationStatus === 'active' ? 'bg-green-500' : 'bg-gray-400'}`} />
@@ -565,30 +635,38 @@ export default function TenantCreditPage() {
                 const suspended = r.tenantStatus === 'suspended';
                 if (!isSiteAdmin) return null;
                 return (
-                  <div className="flex items-center justify-end gap-1.5">
-                    <Tooltip content={suspended ? 'Unavailable for suspended tenants' : 'Add credits to this tenant'}>
-                      <Button variant="accent" size="sm" disabled={suspended}
-                        onClick={() => setTopUpTenant(r)}>
-                        Top-up
-                      </Button>
+                  <div className="flex items-center justify-end gap-0.5">
+                    <Tooltip content={suspended ? 'Unavailable for suspended tenants' : 'Top-up Credits'}>
+                      <IconButton variant="ghost" size="sm" label="Top-up" disabled={suspended}
+                        icon={<Plus className="size-4 text-[#1565F0]" />}
+                        onClick={() => setTopUpTenant(r)} />
                     </Tooltip>
-                    <DropdownMenu
-                      align="end"
-                      trigger={
-                        <IconButton variant="ghost" size="sm" label="More actions"
-                          icon={<MoreHorizontal className="size-4" />} />
-                      }
-                      items={[
-                        { label: 'Edit', icon: <Pencil />, onSelect: () => setEditTenant(r) },
-                        { label: 'Change Plan', icon: <ChevronDown />, disabled: suspended, onSelect: () => setChangePlanTenant(r) },
-                        { label: 'View Dashboard', onSelect: () => setMonitorTenant(r) },
-                        { label: 'Transaction History', onSelect: () => setHistoryTenant(r) },
-                        { type: 'separator' },
-                        suspended
-                          ? { label: 'Activate', icon: <Power />, onSelect: () => setTenants(prev => prev.map(t => t.id === r.id ? { ...t, tenantStatus: 'active' } : t)) }
-                          : { label: 'Deactivate', icon: <PowerOff />, destructive: true, onSelect: () => setTenants(prev => prev.map(t => t.id === r.id ? { ...t, tenantStatus: 'suspended' } : t)) },
-                      ]}
-                    />
+                    <Tooltip content="Edit">
+                      <IconButton variant="ghost" size="sm" label="Edit"
+                        icon={<Pencil className="size-4" />}
+                        onClick={() => setEditTenant(r)} />
+                    </Tooltip>
+                    <Tooltip content={suspended ? 'Change Plan unavailable' : 'Change Plan'}>
+                      <IconButton variant="ghost" size="sm" label="Change Plan" disabled={suspended}
+                        icon={<ArrowLeftRight className="size-4" />}
+                        onClick={() => setChangePlanTenant(r)} />
+                    </Tooltip>
+                    <Tooltip content="View Dashboard">
+                      <IconButton variant="ghost" size="sm" label="View Dashboard"
+                        icon={<LayoutDashboard className="size-4" />}
+                        onClick={() => setMonitorTenant(r)} />
+                    </Tooltip>
+                    <Tooltip content="Transaction History">
+                      <IconButton variant="ghost" size="sm" label="Transaction History"
+                        icon={<Clock className="size-4" />}
+                        onClick={() => setHistoryTenant(r)} />
+                    </Tooltip>
+                    <Tooltip content={suspended ? 'Activate' : 'Deactivate'}>
+                      <IconButton variant="ghost" size="sm"
+                        label={suspended ? 'Activate' : 'Deactivate'}
+                        icon={suspended ? <Power className="size-4 text-green-600" /> : <PowerOff className="size-4 text-red-400" />}
+                        onClick={() => setConfirmToggleTenant(r)} />
+                    </Tooltip>
                   </div>
                 );
               },
@@ -605,22 +683,62 @@ export default function TenantCreditPage() {
       {showCreate && (
         <CreateTenantModal
           onClose={() => setShowCreate(false)}
-          onCreated={(t) => setTenants(prev => [t, ...prev])}
+          onCreated={(t) => { setTenants(prev => [t, ...prev]); toast.success('Tenant created', { description: `${t.name} has been added.` }); }}
         />
       )}
       {editTenant && (
         <EditTenantModal
           tenant={editTenant}
           onClose={() => setEditTenant(null)}
-          onSave={(updated) => setTenants(prev => prev.map(t => t.id === updated.id ? updated : t))}
+          onSave={(updated) => { setTenants(prev => prev.map(t => t.id === updated.id ? updated : t)); setEditTenant(null); toast.success('Tenant updated', { description: `${updated.name} has been saved.` }); }}
         />
       )}
       {changePlanTenant && (
-        <ChangePlanModal tenant={changePlanTenant} onClose={() => setChangePlanTenant(null)} />
+        <ChangePlanModal tenant={changePlanTenant} onClose={() => { setChangePlanTenant(null); toast.success('Plan updated', { description: `${changePlanTenant.name}'s plan has been changed.` }); }} />
       )}
       {topUpTenant && (
-        <TopUpModal tenant={topUpTenant} onClose={() => setTopUpTenant(null)} />
+        <TopUpModal tenant={topUpTenant} onClose={() => { setTopUpTenant(null); toast.success('Credits added', { description: `Top-up applied to ${topUpTenant.name}.` }); }} />
       )}
+
+      {/* Activate / Deactivate confirmation */}
+      {confirmToggleTenant && (() => {
+        const isSuspended = confirmToggleTenant.tenantStatus === 'suspended';
+        return (
+          <Modal
+            open
+            onOpenChange={(v) => { if (!v) setConfirmToggleTenant(null); }}
+            title={isSuspended ? 'Activate Tenant?' : 'Deactivate Tenant?'}
+            size="sm"
+            tone={isSuspended ? undefined : 'warning'}
+            footer={
+              <div className="flex w-full items-center justify-between">
+                <Button variant="secondary" onClick={() => setConfirmToggleTenant(null)}>Cancel</Button>
+                <Button
+                  variant={isSuspended ? undefined : 'danger'}
+                  onClick={() => {
+                    const newStatus = isSuspended ? 'active' : 'suspended';
+                    setTenants(prev => prev.map(t => t.id === confirmToggleTenant.id ? { ...t, tenantStatus: newStatus } : t));
+                    setConfirmToggleTenant(null);
+                    if (isSuspended) {
+                      toast.success('Tenant activated', { description: `${confirmToggleTenant.name} is now active.` });
+                    } else {
+                      toast.warning('Tenant deactivated', { description: `${confirmToggleTenant.name} has been suspended.` });
+                    }
+                  }}
+                >
+                  {isSuspended ? 'Activate' : 'Deactivate'}
+                </Button>
+              </div>
+            }
+          >
+            <p className="text-sm text-[#374151]">
+              {isSuspended
+                ? <>Are you sure you want to activate <strong>{confirmToggleTenant.name}</strong>? Their plan allocation will resume.</>
+                : <>Are you sure you want to deactivate <strong>{confirmToggleTenant.name}</strong>? Their plan allocation will be paused.</>}
+            </p>
+          </Modal>
+        );
+      })()}
       {historyTenant && (
         <Modal open onOpenChange={(v) => { if (!v) setHistoryTenant(null); }}
           title={`Transaction History — ${historyTenant.name}`} size="lg">
