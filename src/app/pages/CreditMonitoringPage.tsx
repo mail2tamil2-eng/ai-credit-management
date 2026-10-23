@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { TrendingUp, Zap, Layers, Users, AlertTriangle, CheckCircle2, ShieldOff, ArrowLeft, LayoutGrid, PanelLeftOpen } from 'lucide-react';
-import { Button, StatWidget, PageHeader, SearchBar, Pagination } from '../components/saas';
+import { TrendingUp, Zap, Layers, Users, AlertTriangle, CheckCircle2, ShieldOff, ArrowLeft } from 'lucide-react';
+import { Button, StatWidget, PageHeader, SearchBar } from '../components/saas';
 import { CreditStatusBadge } from '../components/CreditStatusBadge';
 import type { TenantCredit, CreditStatus } from './creditTypes';
 import { MOCK_TENANTS, MOCK_TRANSACTIONS } from './creditTypes';
@@ -308,17 +308,10 @@ function TenantListItem({ tenant, selected, onClick }: {
   );
 }
 
-const PAGE_SIZE_OPTIONS = [8, 12, 24, 48];
-
 // ── Full Page ─────────────────────────────────────────────────────────────────
-type ViewMode = 'overview' | 'detail';
-
 export default function CreditMonitoringPage() {
-  const [view, setView] = useState<ViewMode>('overview');
   const [selected, setSelected] = useState<TenantCredit>(MOCK_TENANTS[0]);
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(8);
 
   const healthy   = MOCK_TENANTS.filter(t => t.creditStatus === 'active').length;
   const atRisk    = MOCK_TENANTS.filter(t => ['low', 'critical', 'exhausted', 'negative'].includes(t.creditStatus)).length;
@@ -327,139 +320,63 @@ export default function CreditMonitoringPage() {
   const filteredTenants = MOCK_TENANTS.filter(t =>
     !search || t.name.toLowerCase().includes(search.toLowerCase())
   );
-  const pagedTenants = filteredTenants.slice((page - 1) * pageSize, page * pageSize);
-  const totalPages = Math.ceil(filteredTenants.length / pageSize);
-
-  function handleSearch(v: string) {
-    setSearch(v);
-    setPage(1);
-  }
-
-  function openDetail(tenant: TenantCredit) {
-    setSelected(tenant);
-    setView('detail');
-  }
 
   return (
     <div className="px-8 py-6 space-y-6">
       {/* Header */}
-      <PageHeader
-        title="Credit Monitoring"
-        actions={
-          <div className="flex items-center gap-1 rounded-lg border border-gray-200 bg-gray-50 p-0.5">
-            <button
-              onClick={() => setView('overview')}
-              className={[
-                'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all',
-                view === 'overview' ? 'bg-white text-[#111827] shadow-sm' : 'text-gray-500 hover:text-gray-700',
-              ].join(' ')}
-            >
-              <LayoutGrid className="size-3.5" /> All Tenants
-            </button>
-            <button
-              onClick={() => setView('detail')}
-              className={[
-                'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all',
-                view === 'detail' ? 'bg-white text-[#111827] shadow-sm' : 'text-gray-500 hover:text-gray-700',
-              ].join(' ')}
-            >
-              <PanelLeftOpen className="size-3.5" /> Detail View
-            </button>
-          </div>
-        }
-      />
+      <PageHeader title="Credit Monitoring" />
 
       {/* System-wide KPIs */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatWidget label="Total Tenants"   value={MOCK_TENANTS.length} icon={Users}        tone="blue" />
-        <StatWidget label="Healthy"         value={healthy}             icon={CheckCircle2} tone="green"  hint="Credits above threshold" />
-        <StatWidget label="Needs Attention" value={atRisk}              icon={AlertTriangle} tone="amber" hint={atRisk > 0 ? 'Low, critical or exhausted' : 'None'} />
-        <StatWidget label="Suspended"       value={suspended}           icon={ShieldOff}    tone="orange" />
+        <StatWidget label="Total Tenants"   value={MOCK_TENANTS.length} icon={Users}         tone="blue" />
+        <StatWidget label="Healthy"         value={healthy}             icon={CheckCircle2}  tone="green"  hint="Credits above threshold" />
+        <StatWidget label="Needs Attention" value={atRisk}              icon={AlertTriangle} tone="amber"  hint={atRisk > 0 ? 'Low, critical or exhausted' : 'None'} />
+        <StatWidget label="Suspended"       value={suspended}           icon={ShieldOff}     tone="orange" />
       </div>
 
       {/* Search + count */}
       <div className="flex items-center gap-4">
         <div className="max-w-sm flex-1">
-          <SearchBar value={search} onChange={handleSearch} placeholder="Find tenant…" />
+          <SearchBar value={search} onChange={v => setSearch(v)} placeholder="Find tenant…" />
         </div>
         <span className="text-sm text-[#9CA3AF] tabular-nums shrink-0">
           {filteredTenants.length} of {MOCK_TENANTS.length} tenants
         </span>
       </div>
 
-      {/* ── Overview: paginated tenant cards ── */}
-      {view === 'overview' && (
-        <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {pagedTenants.length === 0 && (
-              <p className="col-span-full py-12 text-center text-sm text-[#9CA3AF]">No tenants found</p>
+      {/* Master-detail list */}
+      <div className="flex min-h-[600px] gap-5">
+        <div className="flex w-72 shrink-0 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+          <div className="border-b border-gray-100 p-3">
+            <p className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-[#9CA3AF]">
+              {filteredTenants.length} tenants
+            </p>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+            {filteredTenants.length === 0 && (
+              <p className="px-4 py-8 text-center text-sm text-[#9CA3AF]">No tenants found</p>
             )}
-            {pagedTenants.map(t => (
-              <TenantCard key={t.id} tenant={t} onClick={() => openDetail(t)} />
+            {filteredTenants.map(t => (
+              <TenantListItem key={t.id} tenant={t}
+                selected={selected.id === t.id}
+                onClick={() => setSelected(t)} />
             ))}
           </div>
+        </div>
 
-          {filteredTenants.length > 0 && (
-            <div className="flex items-center justify-between border-t border-gray-100 pt-4">
-              <div className="flex items-center gap-2 text-sm text-[#6B7280]">
-                <span>Show</span>
-                <select
-                  value={pageSize}
-                  onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
-                  className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm text-[#374151] focus:outline-none focus:ring-2 focus:ring-[#1565F0]"
-                >
-                  {PAGE_SIZE_OPTIONS.map(n => (
-                    <option key={n} value={n}>{n} per page</option>
-                  ))}
-                </select>
-                <span className="text-[#9CA3AF]">
-                  · showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filteredTenants.length)} of {filteredTenants.length}
-                </span>
-              </div>
-              {Math.ceil(filteredTenants.length / pageSize) > 1 && (
-                <Pagination page={page} pageSize={pageSize} total={filteredTenants.length}
-                  onPageChange={setPage} itemLabel="tenants" />
-              )}
+        <div className="flex-1 overflow-y-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
+          <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-4">
+            <div>
+              <h2 className="text-base font-bold text-[#111827]">{selected.name}</h2>
+              <p className="text-xs text-[#9CA3AF]">{selected.plan ?? 'No plan assigned'}</p>
             </div>
-          )}
-        </>
-      )}
-
-      {/* ── Detail: master-detail layout ── */}
-      {view === 'detail' && (
-        <div className="flex min-h-[600px] gap-5">
-          <div className="flex w-72 shrink-0 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-            <div className="border-b border-gray-100 p-3">
-              <p className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-[#9CA3AF]">
-                {filteredTenants.length} tenants
-              </p>
-            </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
-              {filteredTenants.length === 0 && (
-                <p className="px-4 py-8 text-center text-sm text-[#9CA3AF]">No tenants found</p>
-              )}
-              {filteredTenants.map(t => (
-                <TenantListItem key={t.id} tenant={t}
-                  selected={selected.id === t.id}
-                  onClick={() => setSelected(t)} />
-              ))}
-            </div>
+            <CreditStatusBadge status={selected.creditStatus} />
           </div>
-
-          <div className="flex-1 overflow-y-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-4">
-              <div>
-                <h2 className="text-base font-bold text-[#111827]">{selected.name}</h2>
-                <p className="text-xs text-[#9CA3AF]">{selected.plan ?? 'No plan assigned'}</p>
-              </div>
-              <CreditStatusBadge status={selected.creditStatus} />
-            </div>
-            <div className="p-6">
-              <CreditMonitoringContent key={selected.id} tenant={selected} />
-            </div>
+          <div className="p-6">
+            <CreditMonitoringContent key={selected.id} tenant={selected} />
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

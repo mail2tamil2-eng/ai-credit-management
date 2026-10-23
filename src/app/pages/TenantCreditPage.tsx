@@ -8,7 +8,7 @@ import {
 import { Switch } from '../components/ui/switch';
 import { CreditStatusBadge } from '../components/CreditStatusBadge';
 import type { TenantCredit, CreditStatus, Plan } from './creditTypes';
-import { MOCK_TENANTS, MOCK_PLANS, AVAILABLE_TENANTS } from './creditTypes';
+import { MOCK_TENANTS, MOCK_PLANS, MOCK_TRANSACTIONS, AVAILABLE_TENANTS } from './creditTypes';
 import CreditTransactionHistory from './CreditTransactionHistory';
 import { CreditMonitoringContent } from './CreditMonitoringPage';
 import { useRole } from '../context/RoleContext';
@@ -387,6 +387,161 @@ function Row({ label, value, bold, blue, green }: { label: string; value: string
   );
 }
 
+// ── Compact Site Admin detail view ────────────────────────────────────────────
+const DETAIL_PLAN_MAX: Record<string, number> = {
+  Starter: 2000, Growth: 5000, Pro: 10000, Enterprise: 150000,
+};
+const DETAIL_STATUS_COLORS: Record<CreditStatus, string> = {
+  active: '#15803D', low: '#B45309', critical: '#EA580C', exhausted: '#DC2626', negative: '#7F1D1D',
+};
+const DETAIL_FEATURES = [
+  { name: 'AI Course Creation', credits: 850 },
+  { name: 'AI Quiz Generator', credits: 400 },
+  { name: 'Text Generation', credits: 300 },
+];
+const DETAIL_FEATURE_COLORS = ['#1565F0', '#8B5CF6', '#059669'];
+
+function TenantDetailView({ tenant, onBack, onViewHistory }: {
+  tenant: TenantCredit;
+  onBack: () => void;
+  onViewHistory: () => void;
+}) {
+  const max = DETAIL_PLAN_MAX[tenant.plan?.split(' ')[0] ?? ''] ?? 5000;
+  const used = Math.max(0, max - tenant.balance);
+  const usedPct = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0;
+  const balancePct = max > 0 ? Math.max(0, Math.min(100, Math.round((tenant.balance / max) * 100))) : 0;
+  const color = DETAIL_STATUS_COLORS[tenant.creditStatus];
+  const totalFeatureCredits = DETAIL_FEATURES.reduce((a, b) => a + b.credits, 0);
+
+  const stats = [
+    { label: 'Total Allocated', value: max.toLocaleString() },
+    { label: 'Credits Used', value: `${used.toLocaleString()} (${usedPct}%)` },
+    { label: 'Plan', value: tenant.plan ?? '—' },
+    { label: 'Next Allocation', value: tenant.nextAllocation ?? '—' },
+    { label: 'Allocation Status', value: tenant.allocationStatus === 'active' ? 'Active' : 'Inactive', green: tenant.allocationStatus === 'active' },
+    { label: 'Transactions', value: String(MOCK_TRANSACTIONS.length) },
+  ] as const;
+
+  return (
+    <div className="px-8 py-5 space-y-4">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onBack}
+          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-[#374151] transition-colors hover:bg-gray-50"
+        >
+          <ArrowLeft className="size-3.5" /> Back
+        </button>
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <h2 className="truncate text-lg font-bold text-[#111827]">{tenant.name}</h2>
+          <CreditStatusBadge status={tenant.creditStatus} />
+          {tenant.tenantStatus === 'suspended' && (
+            <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">Suspended</span>
+          )}
+        </div>
+        <button
+          onClick={onViewHistory}
+          className="flex shrink-0 items-center gap-1.5 text-sm font-medium text-[#1565F0] hover:underline"
+        >
+          <Clock className="size-3.5" /> View History
+        </button>
+      </div>
+
+      {/* Credit summary card */}
+      <div className="rounded-xl border border-[#E5E7EB] bg-white p-4">
+        <div className="flex items-start gap-6">
+          {/* Balance + linear bar */}
+          <div className="min-w-[180px]">
+            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#9CA3AF]">Balance</p>
+            <div className="flex items-baseline gap-1.5">
+              <span className={`text-2xl font-bold tabular-nums ${tenant.balance < 0 ? 'text-red-600' : 'text-[#111827]'}`}>
+                {tenant.balance.toLocaleString()}
+              </span>
+              <span className="text-xs text-[#9CA3AF]">credits</span>
+            </div>
+            <div className="mt-2.5 h-2 rounded-full bg-[#F3F4F6]">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{ width: `${balancePct}%`, background: color }}
+              />
+            </div>
+            <div className="mt-1 flex justify-between text-[11px] text-[#9CA3AF]">
+              <span style={{ color }}>{balancePct}% remaining</span>
+              <span>of {max.toLocaleString()}</span>
+            </div>
+          </div>
+
+          <div className="h-14 w-px self-center shrink-0 bg-[#F3F4F6]" />
+
+          {/* Stats grid */}
+          <div className="grid flex-1 grid-cols-3 gap-x-6 gap-y-3">
+            {stats.map(s => (
+              <div key={s.label}>
+                <p className="text-[11px] text-[#9CA3AF]">{s.label}</p>
+                <p className={`text-sm font-semibold ${'green' in s && s.green ? 'text-green-700' : 'text-[#111827]'}`}>{s.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Usage + Activity — 2 columns */}
+      <div className="grid grid-cols-2 gap-4">
+        {/* Usage by Feature */}
+        <div className="rounded-xl border border-[#E5E7EB] bg-white p-4">
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[#9CA3AF]">Usage by Feature</p>
+          <div className="space-y-3">
+            {DETAIL_FEATURES.map((f, i) => {
+              const pct = Math.round((f.credits / totalFeatureCredits) * 100);
+              return (
+                <div key={f.name}>
+                  <div className="mb-1 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <span className="size-1.5 shrink-0 rounded-full" style={{ background: DETAIL_FEATURE_COLORS[i] }} />
+                      <span className="text-[#374151]">{f.name}</span>
+                    </div>
+                    <span className="tabular-nums">
+                      <span className="font-semibold text-[#111827]">{f.credits.toLocaleString()}</span>
+                      <span className="ml-1 text-[#9CA3AF]">{pct}%</span>
+                    </span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-[#F3F4F6]">
+                    <div className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${pct}%`, background: DETAIL_FEATURE_COLORS[i] }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Recent Activity */}
+        <div className="rounded-xl border border-[#E5E7EB] bg-white p-4">
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[#9CA3AF]">Recent Activity</p>
+          <div>
+            {MOCK_TRANSACTIONS.slice(0, 5).map((t, i) => (
+              <div key={t.id}
+                className={`flex items-center justify-between py-2 ${i < 4 ? 'border-b border-[#F9FAFB]' : ''}`}>
+                <div className="mr-3 min-w-0">
+                  <p className="truncate text-xs font-medium text-[#111827]">{t.description}</p>
+                  <p className="text-[11px] text-[#9CA3AF]">{t.date}</p>
+                </div>
+                <span className={`shrink-0 text-xs font-bold tabular-nums ${t.credits > 0 ? 'text-green-700' : 'text-red-500'}`}>
+                  {t.credits > 0 ? `+${t.credits.toLocaleString()}` : t.credits.toLocaleString()}
+                </span>
+              </div>
+            ))}
+          </div>
+          <button onClick={onViewHistory}
+            className="mt-2 text-xs font-medium text-[#1565F0] hover:underline">
+            View full history →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Credit status labels ───────────────────────────────────────────────────────
 const ALL_STATUSES: CreditStatus[] = ['active', 'low', 'critical', 'exhausted', 'negative'];
 const STATUS_LABELS: Record<CreditStatus, string> = {
@@ -437,16 +592,19 @@ export default function TenantCreditPage() {
 
   if (detailTenant) {
     return (
-      <div className="px-8 py-6 space-y-6">
-        <button
-          onClick={() => setDetailTenant(null)}
-          className="flex items-center gap-1.5 text-sm font-medium text-[#1565F0] hover:underline"
-        >
-          <ArrowLeft className="size-4" /> Back to Tenant Credits
-        </button>
-        <h2 className="text-xl font-bold text-[#111827]">{detailTenant.name}</h2>
-        <CreditMonitoringContent tenant={detailTenant} />
-      </div>
+      <>
+        <TenantDetailView
+          tenant={detailTenant}
+          onBack={() => setDetailTenant(null)}
+          onViewHistory={() => setHistoryTenant(detailTenant)}
+        />
+        {historyTenant && (
+          <Modal open onOpenChange={(v) => { if (!v) setHistoryTenant(null); }}
+            title={`Transaction History — ${historyTenant.name}`} size="lg">
+            <CreditTransactionHistory tenantName={historyTenant.name} />
+          </Modal>
+        )}
+      </>
     );
   }
 
