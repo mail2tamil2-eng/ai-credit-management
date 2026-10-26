@@ -22,6 +22,10 @@ export interface TenantCredit {
   balance: number;
   creditStatus: CreditStatus;
   allocationStatus: AllocationStatus;
+  rollover?: boolean;
+  lowThreshold?: number;
+  criticalThreshold?: number;
+  topUpReference?: string;
 }
 
 export interface Transaction {

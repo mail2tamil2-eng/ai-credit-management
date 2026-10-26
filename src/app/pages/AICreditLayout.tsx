@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router';
-import { BookOpen, CreditCard, BarChart3, ShieldCheck, UserCog, ChevronDown, Check } from 'lucide-react';
+import { BookOpen, CreditCard, ShieldCheck, UserCog, ChevronDown, Check } from 'lucide-react';
 import { AppHeader, AppSidebar } from '../components/saas';
 import { Toaster } from '../components/ui/sonner';
 import { useRole, ROLE_LABELS } from '../context/RoleContext';
@@ -79,10 +79,10 @@ export default function AICreditLayout() {
     ? 'plans'
     : 'credits';
 
-  // Credit managers don't have Tenant Credits access — redirect to monitoring
+  // Keep credit managers on Credit Management when switching roles or opening an old URL.
   useEffect(() => {
-    if (isCreditManager && location.pathname === '/ai-credits') {
-      navigate('/ai-credits/plans', { replace: true });
+    if (isCreditManager && location.pathname !== '/ai-credits') {
+      navigate('/ai-credits', { replace: true });
     }
   }, [isCreditManager, location.pathname, navigate]);
 
@@ -93,12 +93,11 @@ export default function AICreditLayout() {
 
   const sidebarItems = isCreditManager
     ? [
-        { id: 'plans', label: 'Plan Management', icon: BookOpen },
-        { id: 'monitoring', label: 'Monitoring', icon: BarChart3 },
+        { id: 'credits', label: 'Credit Management', icon: CreditCard },
       ]
     : [
         { id: 'plans', label: 'Plan Management', icon: BookOpen },
-        { id: 'credits', label: 'Tenant Credits', icon: CreditCard },
+        { id: 'credits', label: 'Credit Management', icon: CreditCard },
       ];
 
   return (

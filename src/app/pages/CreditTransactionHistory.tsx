@@ -25,9 +25,6 @@ function TransactionTab() {
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
-        <Button variant="secondary" size="sm" leftIcon={<Download className="size-3.5" />}>Export CSV</Button>
-      </div>
       <DataTable
         rows={rows}
         rowKey={r => r.id}
@@ -74,14 +71,28 @@ function ActionTab() {
   );
 }
 
-export default function CreditTransactionHistory({ tenantName }: { tenantName?: string }) {
+export default function CreditTransactionHistory({ tenantName, currentBalance: tenantBalance, showSummary = true }: { tenantName?: string; currentBalance?: number; showSummary?: boolean }) {
   const [tab, setTab] = useState<'transactions' | 'actions'>('transactions');
+  // History is ordered newest first; its latest closing balance is the current balance.
+  const currentBalance = MOCK_TRANSACTIONS[0]?.balanceAfter ?? tenantBalance;
 
   return (
     <div className="space-y-4">
-      {tenantName && (
-        <p className="text-sm text-[#6B7280]">Showing history for <span className="font-semibold text-[#111827]">{tenantName}</span></p>
-      )}
+      {showSummary && <div className="flex flex-wrap items-center justify-between gap-2">
+        {tenantName && (
+          <p className="text-sm text-[#6B7280]">Showing history for <span className="font-semibold text-[#111827]">{tenantName}</span></p>
+        )}
+        {currentBalance !== undefined && (
+          <p className="inline-flex flex-wrap items-baseline gap-x-2 rounded-lg bg-[#EBF3FF] px-3 py-1.5">
+            <span className="text-xs font-medium text-[#1254C7]">Current Balance</span>
+            <span className={`text-base font-bold tabular-nums ${currentBalance <= 0 ? 'text-red-700' : 'text-[#1254C7]'}`}>
+              {currentBalance.toLocaleString()}
+              <span className="ml-1 text-xs font-normal text-[#4B5563]">credits</span>
+            </span>
+          </p>
+        )}
+      </div>}
+      <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex gap-1 rounded-xl bg-[#F3F4F6] p-1 w-fit">
         {(['transactions', 'actions'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)}
@@ -89,6 +100,10 @@ export default function CreditTransactionHistory({ tenantName }: { tenantName?: 
             {t === 'transactions' ? 'Transaction History' : 'Action History'}
           </button>
         ))}
+      </div>
+      {tab === 'transactions' && (
+        <Button variant="secondary" size="sm" leftIcon={<Download className="size-3.5" />}>Export CSV</Button>
+      )}
       </div>
       {tab === 'transactions' ? <TransactionTab /> : <ActionTab />}
     </div>

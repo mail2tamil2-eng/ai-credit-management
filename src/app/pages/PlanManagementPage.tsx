@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, BookOpen, Users, CheckCircle2, ArchiveX, Pencil, Trash2, PowerOff, Power, X, ArrowLeftRight, AlertTriangle } from 'lucide-react';
+import { Plus, BookOpen, Users, CheckCircle2, ArchiveX, Pencil, Trash2, Ban, Power, X, ArrowLeftRight, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Button, DataTable, Pagination, Modal, FormField, TextInput, TextArea, SelectInput,
@@ -103,7 +103,7 @@ function AssignPlanModal({ plan, plans, onClose }: {
   onClose: () => void;
 }) {
   const { role } = useRole();
-  const [step, setStep] = useState<'form' | 'confirm' | 'success' | 'failure'>('form');
+  const [step, setStep] = useState<'form' | 'confirm' | 'failure'>('form');
   const [tenantId, setTenantId] = useState('');
   const [newPlanId, setNewPlanId] = useState(plan.id);
   const [remarks, setRemarks] = useState('');
@@ -172,18 +172,17 @@ function AssignPlanModal({ plan, plans, onClose }: {
     : <>Downgrade <strong>{selectedTenant?.name}</strong> from <strong>{currentPlanName}</strong> to <strong>{newPlan.name}</strong> from <strong>{effectiveFrom}</strong>? No credits are added or removed now. Current balance <strong>{currentBalance.toLocaleString()}</strong> is unchanged.</>;
 
   function handleConfirm() {
-    setStep('success');
     const msg = changeType === 'Initial Assignment'
       ? `${newPlan.name} assigned to ${selectedTenant?.name}.`
       : changeType === 'Upgrade'
       ? `${selectedTenant?.name} upgraded to ${newPlan.name}.`
       : `${selectedTenant?.name} downgraded to ${newPlan.name} from ${effectiveFrom}.`;
     toast.success('Plan updated', { description: msg });
+    onClose();
   }
 
   const modalTitle =
     step === 'confirm' ? 'Confirm Plan Change'
-    : step === 'success' ? 'Plan Updated'
     : step === 'failure' ? 'Update Failed'
     : 'Assign / Change Plan';
 
@@ -211,16 +210,6 @@ function AssignPlanModal({ plan, plans, onClose }: {
         )
       }
     >
-      {/* ── Success ── */}
-      {step === 'success' && (
-        <div className="flex flex-col items-center gap-3 py-6 text-center">
-          <div className="flex size-12 items-center justify-center rounded-full bg-green-50">
-            <CheckCircle2 className="size-6 text-green-600" />
-          </div>
-          <p className="text-[15px] font-semibold text-[#111827]">Plan updated successfully.</p>
-        </div>
-      )}
-
       {/* ── Failure ── */}
       {step === 'failure' && (
         <div className="flex flex-col items-center gap-3 py-6 text-center">
@@ -358,9 +347,10 @@ function AssignPlanModal({ plan, plans, onClose }: {
 }
 
 // ── Delete Blocked Modal ───────────────────────────────────────────────────────
-function DeleteBlockedModal({ open, onClose, plan }: {
+function DeleteBlockedModal({ open, onClose, onDeactivate, plan }: {
   open: boolean;
   onClose: () => void;
+  onDeactivate: () => void;
   plan: Plan | null;
 }) {
   return (
@@ -368,7 +358,7 @@ function DeleteBlockedModal({ open, onClose, plan }: {
       title="Cannot Delete Plan" size="sm" tone="warning"
       footer={<div className="flex justify-end gap-2">
         <Button variant="secondary" onClick={onClose}>Close</Button>
-        <Button variant="secondary" onClick={onClose}>Deactivate Instead</Button>
+        {plan?.status === 'active' && <Button variant="secondary" onClick={onDeactivate}>Deactivate Instead</Button>}
       </div>}>
       <div className="space-y-3 text-sm text-[#374151]">
         <p>
@@ -414,6 +404,7 @@ export default function PlanManagementPage() {
   const [assignTarget, setAssignTarget] = useState<Plan | null>(null);
   const [deleteBlockedPlan, setDeleteBlockedPlan] = useState<Plan | null>(null);
   const [deletePlan, setDeletePlan] = useState<Plan | null>(null);
+  const [togglePlan, setTogglePlan] = useState<Plan | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [page, setPage] = useState(1);
@@ -433,12 +424,18 @@ export default function PlanManagementPage() {
   const hasFilters = statusFilter !== 'all' || search.trim() !== '';
 
   function handleCreate(saved?: Plan) {
-    if (saved) setPlans(p => [saved, ...p]);
+    if (saved) {
+      setPlans(p => [saved, ...p]);
+      toast.success('Plan created', { description: `${saved.name} has been created.` });
+    }
     setCreateOpen(false);
   }
 
   function handleEdit(saved?: Plan) {
-    if (saved) setPlans(p => p.map(x => x.id === saved.id ? saved : x));
+    if (saved) {
+      setPlans(p => p.map(x => x.id === saved.id ? saved : x));
+      toast.success('Plan updated', { description: `${saved.name} has been updated.` });
+    }
     setEditTarget(null);
   }
 
@@ -446,6 +443,12 @@ export default function PlanManagementPage() {
     setPlans(p => p.map(x => x.id === plan.id
       ? { ...x, status: x.status === 'active' ? 'inactive' : 'active' }
       : x));
+    setTogglePlan(null);
+    if (plan.status === 'active') {
+      toast.success('Plan deactivated', { description: `${plan.name} is no longer available for new assignments.` });
+    } else {
+      toast.success('Plan activated', { description: `${plan.name} is now available for assignments.` });
+    }
   }
 
   function handleDeleteClick(plan: Plan) {
@@ -454,7 +457,10 @@ export default function PlanManagementPage() {
   }
 
   function handleDeleteConfirm() {
-    if (deletePlan) setPlans(p => p.filter(x => x.id !== deletePlan.id));
+    if (deletePlan) {
+      setPlans(p => p.filter(x => x.id !== deletePlan.id));
+      toast.success('Plan deleted', { description: `${deletePlan.name} has been deleted.` });
+    }
     setDeletePlan(null);
   }
 
@@ -583,24 +589,24 @@ export default function PlanManagementPage() {
               cell: r => (
                 <div className="flex items-center justify-end gap-0.5">
                   <Tooltip content="Edit">
-                    <IconButton variant="ghost" size="sm" label="Edit"
+                    <IconButton variant="table" tone="primary" size="sm" label="Edit"
                       icon={<Pencil className="size-4" />}
                       onClick={() => setEditTarget(r)} />
                   </Tooltip>
                   <Tooltip content="Assign / Change Plan">
-                    <IconButton variant="ghost" size="sm" label="Assign / Change Plan"
+                    <IconButton variant="table" tone="primary" size="sm" label="Assign / Change Plan"
                       icon={<ArrowLeftRight className="size-4" />}
                       onClick={() => setAssignTarget(r)} />
                   </Tooltip>
                   <Tooltip content={r.status === 'active' ? 'Deactivate' : 'Activate'}>
-                    <IconButton variant="ghost" size="sm"
+                    <IconButton variant="table" tone={r.status === 'active' ? 'danger' : 'success'} size="sm"
                       label={r.status === 'active' ? 'Deactivate' : 'Activate'}
-                      icon={r.status === 'active' ? <PowerOff className="size-4" /> : <Power className="size-4" />}
-                      onClick={() => handleToggle(r)} />
+                      icon={r.status === 'active' ? <Ban className="size-4" /> : <Power className="size-4" />}
+                      onClick={() => setTogglePlan(r)} />
                   </Tooltip>
                   <Tooltip content="Delete">
-                    <IconButton variant="ghost" size="sm" label="Delete"
-                      icon={<Trash2 className="size-4 text-red-400" />}
+                    <IconButton variant="table" tone="danger" size="sm" label="Delete"
+                      icon={<Trash2 className="size-4" />}
                       onClick={() => handleDeleteClick(r)} />
                   </Tooltip>
                 </div>
@@ -615,12 +621,32 @@ export default function PlanManagementPage() {
       </div>
 
       {/* Modals */}
-      <PlanModal open={createOpen} onClose={handleCreate} />
+      {createOpen && <PlanModal open onClose={handleCreate} />}
       {editTarget && <PlanModal open onClose={handleEdit} initial={editTarget} />}
       {assignTarget && (
         <AssignPlanModal plan={assignTarget} plans={plans} onClose={() => setAssignTarget(null)} />
       )}
-      <DeleteBlockedModal open={!!deleteBlockedPlan} onClose={() => setDeleteBlockedPlan(null)} plan={deleteBlockedPlan} />
+      {togglePlan && (
+        <Modal open onOpenChange={open => { if (!open) setTogglePlan(null); }}
+          title={togglePlan.status === 'active' ? 'Deactivate Plan?' : 'Activate Plan?'}
+          size="sm" tone={togglePlan.status === 'active' ? 'warning' : undefined}
+          footer={
+            <div className="flex w-full items-center justify-between">
+              <Button variant="secondary" onClick={() => setTogglePlan(null)}>Cancel</Button>
+              <Button variant={togglePlan.status === 'active' ? 'danger' : 'primary'} onClick={() => handleToggle(togglePlan)}>
+                {togglePlan.status === 'active' ? 'Deactivate Plan' : 'Activate Plan'}
+              </Button>
+            </div>
+          }>
+          <p className="text-sm text-[#374151]">
+            {togglePlan.status === 'active'
+              ? <>Deactivate <strong>{togglePlan.name}</strong>? It will no longer be available for new assignments. Existing tenants will keep their plan.</>
+              : <>Activate <strong>{togglePlan.name}</strong>? It will become available for tenant assignments.</>}
+          </p>
+        </Modal>
+      )}
+      <DeleteBlockedModal open={!!deleteBlockedPlan} onClose={() => setDeleteBlockedPlan(null)}
+        onDeactivate={() => { setTogglePlan(deleteBlockedPlan); setDeleteBlockedPlan(null); }} plan={deleteBlockedPlan} />
       <ConfirmDeleteModal open={!!deletePlan} onClose={() => setDeletePlan(null)} onConfirm={handleDeleteConfirm} plan={deletePlan} />
     </div>
   );

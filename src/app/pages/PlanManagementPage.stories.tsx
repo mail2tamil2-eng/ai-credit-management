@@ -13,7 +13,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       <AppSidebar
         groups={[{ label: 'AI Credit Management', items: [
           { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-          { id: 'credits', label: 'Tenant Credits', icon: CreditCard },
+          { id: 'credits', label: 'Credit Management', icon: CreditCard },
           { id: 'plans', label: 'Plan Management', icon: BookOpen },
           { id: 'monitoring', label: 'Monitoring', icon: BarChart3 },
         ]}]}

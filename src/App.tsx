@@ -9,7 +9,7 @@ import CreditMonitoringPage from './app/pages/CreditMonitoringPage';
 import OrgCreditDashboardPage from './app/pages/OrgCreditDashboardPage';
 
 const NAV_SITE_ADMIN = [
-  { id: '/credits',   label: 'Tenant Credits',   icon: CreditCard },
+  { id: '/credits',   label: 'Credit Management',   icon: CreditCard },
   { id: '/plans',     label: 'Plan Management',  icon: BookOpen },
   { id: '/monitoring',label: 'Monitoring',       icon: BarChart3 },
 ];

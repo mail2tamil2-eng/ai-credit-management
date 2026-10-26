@@ -41,9 +41,11 @@ function Shell({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen bg-[#F9FAFB]" style={{ fontFamily: 'Nunito Sans, system-ui, sans-serif' }}>
         <AppSidebar
           groups={[{ items: [
-            { id: 'credits', label: 'Tenant Credits', icon: CreditCard },
-            { id: 'plans', label: 'Plan Management', icon: BookOpen, disabled: isCreditManager },
-            { id: 'monitoring', label: 'Monitoring', icon: BarChart3 },
+            { id: 'credits', label: 'Credit Management', icon: CreditCard },
+            ...(!isCreditManager ? [
+              { id: 'plans', label: 'Plan Management', icon: BookOpen },
+              { id: 'monitoring', label: 'Monitoring', icon: BarChart3 },
+            ] : []),
           ]}]}
           activeId={active} onNavigate={setActive} collapsed={collapsed}
           onToggleCollapsed={() => setCollapsed(c => !c)}
