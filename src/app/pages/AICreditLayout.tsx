@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Outlet, useNavigate, useLocation } from 'react-router';
+import { Navigate, Outlet, useNavigate, useLocation } from 'react-router';
 import { BookOpen, CreditCard, ShieldCheck, UserCog, ChevronDown, Check } from 'lucide-react';
 import { AppHeader, AppSidebar } from '../components/saas';
 import { Toaster } from '../components/ui/sonner';
@@ -45,7 +45,7 @@ function RoleSwitcher() {
           <p className="px-2.5 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.07em] text-gray-400">
             Switch Role
           </p>
-          {(['site-admin', 'credit-manager'] as AppRole[]).map(r => (
+          {(['site-admin', 'credit-manager', 'org-admin'] as AppRole[]).map(r => (
             <button
               key={r}
               className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] text-[#374151] hover:bg-gray-50"
@@ -71,6 +71,7 @@ export default function AICreditLayout() {
   const location = useLocation();
 
   const isCreditManager = role === 'credit-manager';
+  const isOrgAdmin = role === 'org-admin';
   const sidebarW = collapsed ? 64 : 220;
 
   const activeId = location.pathname.startsWith('/ai-credits/monitoring')
@@ -91,9 +92,9 @@ export default function AICreditLayout() {
     if (route) navigate(route);
   }
 
-  const sidebarItems = isCreditManager
+  const sidebarItems = isCreditManager || isOrgAdmin
     ? [
-        { id: 'credits', label: 'Credit Management', icon: CreditCard },
+        { id: 'credits', label: isOrgAdmin ? 'AI Credits' : 'Credit Management', icon: CreditCard },
       ]
     : [
         { id: 'plans', label: 'Plan Management', icon: BookOpen },
@@ -124,7 +125,7 @@ export default function AICreditLayout() {
       >
         <AppHeader
           userName={ROLE_LABELS[role]}
-          userRole={isCreditManager ? 'Credit Manager' : 'Site Admin'}
+          userRole={ROLE_LABELS[role]}
           notificationCount={4}
           actions={<RoleSwitcher />}
         />
@@ -132,7 +133,9 @@ export default function AICreditLayout() {
 
       {/* Main content */}
       <main style={{ paddingTop: 80, marginLeft: sidebarW, transition: 'margin-left 200ms ease' }}>
-        <Outlet />
+        {isOrgAdmin && location.pathname !== '/ai-credits'
+          ? <Navigate to="/ai-credits" replace />
+          : <Outlet />}
       </main>
 
       <Toaster position="top-right" richColors />

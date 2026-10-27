@@ -23,6 +23,8 @@ export interface TenantCredit {
   creditStatus: CreditStatus;
   allocationStatus: AllocationStatus;
   rollover?: boolean;
+  allowOrgAdminStopAllocation?: boolean;
+  allocationStopReason?: string;
   lowThreshold?: number;
   criticalThreshold?: number;
   topUpReference?: string;
@@ -73,7 +75,7 @@ export const MOCK_TENANTS: TenantCredit[] = [
   { id: 't1', name: 'Nova Skills',          tenantStatus: 'active',    plan: 'Growth (Monthly)',   nextAllocation: '01 Nov 2026', balance: -140,  creditStatus: 'negative',  allocationStatus: 'active' },
   { id: 't2', name: 'Bright Minds',         tenantStatus: 'active',    plan: 'Starter (Monthly)',  nextAllocation: '01 Nov 2026', balance: 0,     creditStatus: 'exhausted', allocationStatus: 'active' },
   { id: 't3', name: 'Apex Learning',        tenantStatus: 'active',    plan: 'Pro (Monthly)',      nextAllocation: '01 Jan 2027', balance: 95,    creditStatus: 'critical',  allocationStatus: 'active' },
-  { id: 't4', name: 'Sunrise Institute',    tenantStatus: 'active',    plan: 'Starter (Monthly)',  nextAllocation: '01 Nov 2026', balance: 620,   creditStatus: 'low',       allocationStatus: 'active' },
+  { id: 't4', name: 'Sunrise Institute',    tenantStatus: 'active',    plan: 'Starter (Monthly)',  nextAllocation: '01 Nov 2026', balance: 620,   creditStatus: 'low',       allocationStatus: 'active', allowOrgAdminStopAllocation: true },
   { id: 't5', name: 'Greenfield Academy',   tenantStatus: 'active',    plan: 'Growth (Monthly)',   nextAllocation: '01 Nov 2026', balance: 8450,  creditStatus: 'active',    allocationStatus: 'active' },
   { id: 't6', name: 'Orbit Tech Academy',   tenantStatus: 'active',    plan: undefined,            nextAllocation: undefined,     balance: 0,     creditStatus: 'exhausted', allocationStatus: 'active' },
   { id: 't7', name: 'Vista Institute',      tenantStatus: 'suspended', plan: 'Starter (Monthly)',  nextAllocation: 'Paused',      balance: 310,   creditStatus: 'active',    allocationStatus: 'active' },

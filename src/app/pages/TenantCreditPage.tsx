@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { Download, AlertTriangle, Users, Layers, Zap, Activity, ChevronDown, ChevronRight, X, Plus, Building2, Info, Pencil, Ban, Power, ArrowLeft } from 'lucide-react';
 import {
-  Button, DataTable, Pagination, Modal, FormField, SearchBar,
+  Button, Checkbox, DataTable, Pagination, Modal, FormField, SearchBar,
   Tooltip, PageHeader, StatWidget, DropdownMenu, IconButton, TextInput, TextArea, SelectInput,
 } from '../components/saas';
 import { Switch } from '../components/ui/switch';
@@ -10,7 +10,7 @@ import { CreditStatusBadge } from '../components/CreditStatusBadge';
 import type { TenantCredit, CreditStatus } from './creditTypes';
 import { MOCK_TENANTS, MOCK_PLANS, MOCK_TRANSACTIONS, AVAILABLE_TENANTS } from './creditTypes';
 import CreditTransactionHistory from './CreditTransactionHistory';
-import { useRole } from '../context/RoleContext';
+import { ORG_ADMIN_TENANT_ID, useRole } from '../context/RoleContext';
 
 
 // ── Create Tenant Modal ────────────────────────────────────────────────────────
@@ -20,6 +20,7 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
   const [name, setName] = useState(tenant?.name ?? '');
   const [planId, setPlanId] = useState(currentPlan?.id ?? '');
   const [rollover, setRollover] = useState(tenant?.rollover ?? true);
+  const [allowOrgAdminStopAllocation, setAllowOrgAdminStopAllocation] = useState(tenant?.allowOrgAdminStopAllocation ?? false);
   const [topUp, setTopUp] = useState('');
   const [reference, setReference] = useState('');
   const [nameError, setNameError] = useState('');
@@ -27,6 +28,7 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
   const [lowThreshold, setLowThreshold] = useState(String(tenant?.lowThreshold ?? 20));
   const [criticalThreshold, setCriticalThreshold] = useState(String(tenant?.criticalThreshold ?? 10));
   const [thresholdError, setThresholdError] = useState('');
+  const [reviewing, setReviewing] = useState(false);
 
   const activePlans = MOCK_PLANS.filter(p => p.status === 'active' || p.id === currentPlan?.id);
   const selectedPlan = activePlans.find(p => p.id === planId) ?? null;
@@ -35,6 +37,37 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
   const planChanged = planId !== (currentPlan?.id ?? '');
   const creditsAdded = tenant ? (planChanged ? Math.max(0, planCredits - (currentPlan?.credits ?? 0)) : 0) : planCredits;
   const openingBalance = (tenant?.balance ?? 0) + creditsAdded + extraCredits;
+  const changeType = !planChanged ? 'No Change' : !selectedPlan ? 'Plan Removed'
+    : !currentPlan ? 'Initial Assignment' : planCredits > currentPlan.credits ? 'Upgrade'
+    : planCredits < currentPlan.credits ? 'Downgrade' : 'Plan Change';
+  const changeTone = changeType === 'Upgrade' || changeType === 'Initial Assignment'
+    ? 'bg-green-50 text-green-700' : changeType === 'Downgrade' || changeType === 'Plan Removed'
+    ? 'bg-amber-50 text-amber-700' : 'bg-gray-100 text-gray-600';
+
+  const impactSummary = (
+    <div className="rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-3 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-[13px]">
+        <div className="flex items-center gap-2">
+          <span className="text-[#6B7280]">Change Type</span>
+          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${changeTone}`}>{changeType}</span>
+        </div>
+        <div><span className="mr-1.5 text-[#9CA3AF]">Effective</span><span className="font-medium text-[#374151]">Immediately</span></div>
+      </div>
+      <div className="flex items-center justify-between border-t border-[#E5E7EB] pt-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[#9CA3AF]">Credits added now</p>
+          <p className="text-base font-bold tabular-nums text-green-700">+{(creditsAdded + extraCredits).toLocaleString()}</p>
+        </div>
+        <div className="h-8 w-px bg-[#E5E7EB]" />
+        <div className="text-right">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[#9CA3AF]">Balance after</p>
+          <p className="text-base font-bold tabular-nums text-[#1565F0]">{openingBalance.toLocaleString()}</p>
+        </div>
+      </div>
+      {extraCredits > 0 && <p className="text-xs text-[#6B7280]">Includes {extraCredits.toLocaleString()} top-up credits.</p>}
+      {(changeType === 'Downgrade' || changeType === 'Plan Removed') && <p className="text-xs text-amber-700">Existing credits are retained. No credits are removed.</p>}
+    </div>
+  );
 
   function deriveCreditStatus(balance: number, planCreds: number, lowPct = 0.20, critPct = 0.10): CreditStatus {
     if (balance < 0) return 'negative';
@@ -48,6 +81,7 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
   }
 
   function handleSave() {
+    if (suspended) return;
     let valid = true;
     if (!name.trim()) { setNameError('Tenant name is required'); valid = false; }
     if (extraCredits > 0 && !reference.trim()) { setRefError('Reference is required for top-up'); valid = false; }
@@ -64,6 +98,7 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
       valid = false;
     }
     if (!valid) return;
+    if (tenant && !reviewing) { setReviewing(true); return; }
     const updatedTenant: TenantCredit = {
       ...tenant,
       id: tenant?.id ?? `T-${Date.now().toString(36).toUpperCase().slice(-6)}`,
@@ -77,6 +112,7 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
       creditStatus: deriveCreditStatus(openingBalance, planCredits, lowVal / 100, critVal / 100),
       allocationStatus: tenant && !planChanged ? tenant.allocationStatus : selectedPlan ? 'active' : 'inactive',
       rollover,
+      allowOrgAdminStopAllocation,
       lowThreshold: lowVal,
       criticalThreshold: critVal,
       topUpReference: extraCredits > 0 ? reference.trim() : tenant?.topUpReference,
@@ -90,6 +126,29 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
     ...activePlans.map(p => ({ value: p.id, label: `${p.name} (${p.interval}) — ${p.credits.toLocaleString()} credits` })),
   ];
 
+  if (reviewing && tenant) return (
+    <Modal open onOpenChange={open => { if (!open) onClose(); }} title="Confirm Plan Change" size="sm"
+      footer={<div className="flex w-full items-center justify-between">
+        <Button variant="secondary" onClick={() => setReviewing(false)}>Back</Button>
+        <Button onClick={handleSave}>Confirm</Button>
+      </div>}>
+      <div className="space-y-4">
+        <p className="text-sm text-[#374151]">Confirm the following changes for <strong>{tenant.name}</strong>?</p>
+        <div className="space-y-2 rounded-lg border border-[#E5E7EB] p-3">
+          <Row label="Current Plan" value={tenant.plan ?? 'No plan assigned'} />
+          <Row label="New Plan" value={selectedPlan ? `${selectedPlan.name} (${selectedPlan.interval})` : 'No plan'} bold />
+        </div>
+        {impactSummary}
+        <div className="space-y-2 text-sm">
+          <Row label="Rollover unused credits" value={rollover ? 'On' : 'Off'} />
+          <Row label="Org Admin can stop allocation" value={allowOrgAdminStopAllocation ? 'Yes' : 'No'} />
+          <Row label="Low / Critical thresholds" value={`${lowThreshold}% / ${criticalThreshold}%`} />
+          {extraCredits > 0 && <Row label="Reference" value={reference} />}
+        </div>
+      </div>
+    </Modal>
+  );
+
   return (
     <Modal
       open
@@ -100,7 +159,7 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
       footer={
         <div className="flex w-full items-center justify-between">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button leftIcon={tenant ? undefined : <Building2 className="size-4" />} onClick={handleSave}>{tenant ? "Save Changes" : "Assign Tenant"}</Button>
+          <Button leftIcon={tenant ? undefined : <Building2 className="size-4" />} onClick={handleSave}>{tenant ? "Review & Confirm" : "Assign Tenant"}</Button>
         </div>
       }
     >
@@ -122,7 +181,11 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
         </FormField>}
 
         {/* Plan */}
-        <FormField label="Plan">
+        {tenant && <div>
+          <p className="mb-1 text-[13px] font-medium text-[#374151]">Current Plan</p>
+          <p className="rounded-lg border border-[#E5E7EB] bg-[#F3F4F6] px-3 py-2.5 text-sm text-[#6B7280]">{tenant.plan ?? 'No plan assigned'}</p>
+        </div>}
+        <FormField label={tenant ? 'New Plan' : 'Plan'}>
           {({ id }) => (
             <SelectInput id={id} value={planId} options={planOptions} disabled={suspended}
               onChange={e => setPlanId(e.target.value)} />
@@ -130,17 +193,11 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
         </FormField>
 
         {/* Allocation info — only when a plan is chosen */}
-        {tenant ? (
-          <p className="rounded-lg bg-[#EBF3FF] px-3 py-2 text-xs text-[#1254C7]">
-            {suspended ? "Plan changes and top-ups are unavailable while this tenant is suspended." : `${creditsAdded.toLocaleString()} credits added from this plan change. Existing balance is retained.`}
-          </p>
-        ) : selectedPlan && (
+        {tenant ? impactSummary : selectedPlan && (
           <div className="flex items-center gap-2 rounded-lg bg-[#EBF3FF] px-3 py-2 text-xs text-[#1254C7]">
             <Info className="size-3.5 shrink-0" />
             <span>
-              <span className="font-semibold">{selectedPlan.credits.toLocaleString()} credits</span>
-              {' '}allocated immediately · next {selectedPlan.interval.toLowerCase()} on{' '}
-              <span className="font-semibold">{selectedPlan.interval === 'Monthly' ? '01 Nov 2026' : '01 Oct 2027'}</span>
+              Effective upon saving. Next allocation: {selectedPlan.interval === 'Monthly' ? '01 Nov 2026' : '01 Oct 2027'}.
             </span>
           </div>
         )}
@@ -150,8 +207,13 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
           <label htmlFor="rollover-switch" className="text-[13px] font-semibold text-[#374151] cursor-pointer">
             Rollover unused credits
           </label>
-          <Switch id="rollover-switch" checked={rollover} onCheckedChange={setRollover} />
+          <Switch id="rollover-switch" checked={rollover} onCheckedChange={setRollover}
+            className="data-[state=checked]:bg-[#1565F0]" />
         </div>
+
+        <Checkbox label="Allow Org Admin to Stop Credit Allocation"
+          className="[&>span:last-child]:text-[#374151] [&>span:last-child]:font-normal"
+          checked={allowOrgAdminStopAllocation} onChange={setAllowOrgAdminStopAllocation} />
 
         <div className="h-px bg-[#F3F4F6]" />
 
@@ -164,6 +226,7 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
                   <TextInput
                     id={id} type="number" min={1} max={99}
                     value={lowThreshold}
+                    aria-describedby="credit-threshold-help"
                     onChange={e => { setLowThreshold(e.target.value); setThresholdError(''); }}
                     style={{ paddingRight: '2rem' }}
                   />
@@ -177,6 +240,7 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
                   <TextInput
                     id={id} type="number" min={1} max={99}
                     value={criticalThreshold}
+                    aria-describedby="credit-threshold-help"
                     onChange={e => { setCriticalThreshold(e.target.value); setThresholdError(''); }}
                     style={{ paddingRight: '2rem' }}
                   />
@@ -185,6 +249,9 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
               )}
             </FormField>
           </div>
+          <p id="credit-threshold-help" className="mt-2 text-xs leading-relaxed text-[#6B7280]">
+            Alerts notify the Credit Manager and Org Admin when credits reach the configured thresholds.
+          </p>
           {thresholdError && <p className="mt-1.5 text-xs text-red-600">{thresholdError}</p>}
         </div>
 
@@ -209,12 +276,12 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
         )}
 
         {/* Opening balance summary */}
-        <div className="flex items-center justify-between rounded-lg bg-[#F9FAFB] border border-[#E5E7EB] px-4 py-3">
+        {!tenant && <div className="flex items-center justify-between rounded-lg bg-[#F9FAFB] border border-[#E5E7EB] px-4 py-3">
           <span className="text-[13px] font-semibold text-[#374151]">{tenant ? "Balance after saving" : "Opening balance"}</span>
           <span className="text-base font-bold text-[#1565F0] tabular-nums">
             {openingBalance.toLocaleString()} <span className="text-xs font-semibold text-[#6B7280]">credits</span>
           </span>
-        </div>
+        </div>}
 
       </div>
     </Modal>
@@ -315,10 +382,15 @@ const DETAIL_FEATURES = [
 ];
 const DETAIL_FEATURE_COLORS = ['#1565F0', '#8B5CF6', '#059669'];
 
-function TenantDetailView({ tenant, onBack }: {
+function TenantDetailView({ tenant, onBack, onStopAllocation }: {
   tenant: TenantCredit;
-  onBack: () => void;
+  onBack?: () => void;
+  onStopAllocation?: (reason: string) => void;
 }) {
+  const [confirmStop, setConfirmStop] = useState(false);
+  const [stopReason, setStopReason] = useState('');
+  const canStop = !!onStopAllocation && !!tenant.allowOrgAdminStopAllocation
+    && !!tenant.plan && tenant.allocationStatus === 'active' && tenant.tenantStatus === 'active';
   const max = DETAIL_PLAN_MAX[tenant.plan?.split(' ')[0] ?? ''] ?? 5000;
   const used = Math.max(0, max - tenant.balance);
   const usedPct = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0;
@@ -338,13 +410,13 @@ function TenantDetailView({ tenant, onBack }: {
   return (
     <div className="px-8 py-5 space-y-4">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <button
+      <div className="flex flex-wrap items-center gap-3">
+        {onBack && <button
           onClick={onBack}
           className="flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-[#374151] transition-colors hover:bg-gray-50"
         >
           <ArrowLeft className="size-3.5" /> Back
-        </button>
+        </button>}
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <h2 className="truncate text-lg font-bold text-[#111827]">{tenant.name}</h2>
           <CreditStatusBadge status={tenant.creditStatus} />
@@ -352,7 +424,39 @@ function TenantDetailView({ tenant, onBack }: {
             <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">Suspended</span>
           )}
         </div>
+      {onStopAllocation && (
+        <div className="ml-auto shrink-0">
+          <Tooltip content={!tenant.allowOrgAdminStopAllocation
+            ? 'Your credit manager has not enabled this permission'
+            : tenant.allocationStatus === 'inactive' ? 'Credit allocation is already inactive'
+            : 'Stop future credit allocations'}>
+            <Button variant="secondary" leftIcon={<Ban className="size-4" />}
+              disabled={!canStop} onClick={() => { setStopReason(''); setConfirmStop(true); }}>
+              Inactivate Plan
+            </Button>
+          </Tooltip>
+        </div>
+      )}
       </div>
+      {confirmStop && canStop && (
+        <Modal open title="Inactivate Plan?" size="sm" tone="warning"
+          onOpenChange={open => { if (!open) setConfirmStop(false); }}
+          footer={<div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setConfirmStop(false)}>Cancel</Button>
+            <Button variant="danger" disabled={!stopReason.trim()} onClick={() => {
+              onStopAllocation?.(stopReason.trim());
+              setConfirmStop(false);
+            }}>Inactivate Plan</Button>
+          </div>}>
+          <div className="space-y-4">
+            <p className="text-sm text-[#374151]">Are you sure you want to inactivate the plan? <strong>Future AI credit allocations will stop.</strong> Existing available credits can continue to be used.</p>
+            <FormField label="Reason / Remarks" required>
+              {({ id }) => <TextArea id={id} rows={3} value={stopReason}
+                onChange={event => setStopReason(event.target.value)} placeholder="Enter reason" />}
+            </FormField>
+          </div>
+        </Modal>
+      )}
 
       {/* Credit summary card */}
       <div className="rounded-xl border border-[#E5E7EB] bg-white p-4">
@@ -499,6 +603,18 @@ export default function TenantCreditPage() {
   }
 
   const hasFilters = statusFilter.length > 0 || needsAttention || tenantStatusFilter !== 'all';
+
+  if (role === 'org-admin') {
+    const ownTenant = tenants.find(t => t.id === ORG_ADMIN_TENANT_ID);
+    if (!ownTenant) return <p className="p-8 text-sm text-gray-600">No tenant is assigned to your account.</p>;
+    return <TenantDetailView key={`org-${ownTenant.id}`} tenant={ownTenant} onStopAllocation={reason => {
+      if (!ownTenant.allowOrgAdminStopAllocation || !ownTenant.plan || ownTenant.tenantStatus !== 'active' || ownTenant.allocationStatus !== 'active' || !reason.trim()) return;
+      setTenants(previous => previous.map(t => t.id === ownTenant.id
+        ? { ...t, allocationStatus: 'inactive', nextAllocation: 'Paused', allocationStopReason: reason }
+        : t));
+      toast.success('Plan inactivated', { description: 'Future credit allocations have stopped. Your existing credits remain available.' });
+    }} />;
+  }
 
   if (detailTenant) {
     return <TenantDetailView tenant={detailTenant} onBack={() => setDetailTenant(null)} />;
@@ -706,8 +822,8 @@ export default function TenantCreditPage() {
                         icon={<Plus className="size-4" />}
                         onClick={() => setTopUpTenant(r)} />
                     </Tooltip>
-                    <Tooltip content="Edit/change plan">
-                      <IconButton variant="table" tone="primary" size="sm" label="Edit/change plan"
+                    <Tooltip content={suspended ? 'Edit unavailable for suspended tenants' : 'Edit/change plan'}>
+                      <IconButton variant="table" tone="primary" size="sm" label="Edit/change plan" disabled={suspended}
                         icon={<Pencil className="size-4" />}
                         onClick={() => setEditTenant(r)} />
                     </Tooltip>

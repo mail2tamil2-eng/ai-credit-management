@@ -1,13 +1,12 @@
 import { useState } from 'react';
-import { Plus, BookOpen, Users, CheckCircle2, ArchiveX, Pencil, Trash2, Ban, Power, X, ArrowLeftRight, AlertTriangle } from 'lucide-react';
+import { Plus, BookOpen, Users, CheckCircle2, ArchiveX, Pencil, Trash2, Ban, Power, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Button, DataTable, Pagination, Modal, FormField, TextInput, TextArea, SelectInput,
   PageHeader, StatWidget, SearchBar, IconButton, Tooltip,
 } from '../components/saas';
 import type { Plan, PlanInterval } from './creditTypes';
-import { MOCK_PLANS, MOCK_TENANTS } from './creditTypes';
-import { useRole } from '../context/RoleContext';
+import { MOCK_PLANS } from './creditTypes';
 
 const INTERVALS: PlanInterval[] = ['Monthly', 'Yearly'];
 
@@ -61,14 +60,14 @@ function PlanModal({ open, onClose, initial }: {
         </FormField>
 
         <div className="grid grid-cols-2 gap-3">
-          <FormField label="Billing Interval" required>
+          <FormField label="Allocation" required>
             {({ id }) => (
               <SelectInput id={id} value={interval}
                 onChange={e => setInterval(e.target.value as PlanInterval)}
                 options={INTERVALS.map(i => ({ value: i, label: i }))} />
             )}
           </FormField>
-          <FormField label="Credits / Interval" required hint="Allocated each period">
+          <FormField label="Credits" required hint="Allocated each period">
             {({ id, describedBy, invalid }) => (
               <TextInput id={id} aria-describedby={describedBy} invalid={invalid}
                 type="number" min={1} value={credits}
@@ -92,256 +91,6 @@ function PlanModal({ open, onClose, initial }: {
           )}
         </FormField>
       </div>
-    </Modal>
-  );
-}
-
-// ── Assign / Change Plan Modal ────────────────────────────────────────────────
-function AssignPlanModal({ plan, plans, onClose }: {
-  plan: Plan;
-  plans: Plan[];
-  onClose: () => void;
-}) {
-  const { role } = useRole();
-  const [step, setStep] = useState<'form' | 'confirm' | 'failure'>('form');
-  const [tenantId, setTenantId] = useState('');
-  const [newPlanId, setNewPlanId] = useState(plan.id);
-  const [remarks, setRemarks] = useState('');
-
-  const selectedTenant = MOCK_TENANTS.find(t => t.id === tenantId) ?? null;
-  const currentPlanName = selectedTenant?.plan ?? null;
-  const currentPlan = currentPlanName
-    ? plans.find(p => currentPlanName.startsWith(p.name))
-    : null;
-  const newPlan = plans.find(p => p.id === newPlanId) ?? plan;
-
-  const activePlansExceptCurrent = plans.filter(
-    p => p.status === 'active' && p.id !== currentPlan?.id
-  );
-
-  const changeType = !currentPlan
-    ? 'Initial Assignment'
-    : newPlan.credits > currentPlan.credits
-    ? 'Upgrade'
-    : newPlan.credits < currentPlan.credits
-    ? 'Downgrade'
-    : 'No Change';
-
-  const effectiveFrom = changeType === 'Downgrade'
-    ? (selectedTenant?.nextAllocation ?? 'Next allocation date')
-    : 'Immediately';
-
-  const creditsAddedNow = changeType === 'Downgrade'
-    ? 0
-    : changeType === 'Initial Assignment'
-    ? newPlan.credits
-    : newPlan.credits - (currentPlan?.credits ?? 0);
-
-  const currentBalance = selectedTenant?.balance ?? 0;
-  const balanceAfter = currentBalance + creditsAddedNow;
-
-  const doneBy = role === 'site-admin' ? 'Site Admin' : 'Credit Manager';
-  const dateTime = new Date().toLocaleString('en-GB', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
-
-  const tenantOptions = [
-    { value: '', label: 'Select a tenant' },
-    ...MOCK_TENANTS.filter(t => t.plan?.startsWith(plan.name)).map(t => ({ value: t.id, label: t.name })),
-  ];
-
-  const newPlanOptions = activePlansExceptCurrent.map(p => ({
-    value: p.id,
-    label: `${p.name} (${p.interval}) — ${p.credits.toLocaleString()} credits`,
-  }));
-
-  const canAssign = !!tenantId && !!newPlanId && changeType !== 'No Change';
-
-  const changeTypeBadge = {
-    'Initial Assignment': 'bg-blue-50 text-blue-700',
-    Upgrade: 'bg-green-50 text-green-700',
-    Downgrade: 'bg-amber-50 text-amber-700',
-    'No Change': 'bg-gray-100 text-gray-500',
-  }[changeType];
-
-  const confirmationMessage = changeType === 'Initial Assignment'
-    ? <>Assign <strong>{newPlan.name}</strong> to <strong>{selectedTenant?.name}</strong>? <strong>{creditsAddedNow.toLocaleString()}</strong> credits will be added now.</>
-    : changeType === 'Upgrade'
-    ? <>Upgrade <strong>{selectedTenant?.name}</strong> from <strong>{currentPlanName}</strong> to <strong>{newPlan.name}</strong>? <strong>{creditsAddedNow.toLocaleString()}</strong> credits will be added now. Balance after change: <strong>{balanceAfter.toLocaleString()}</strong>.</>
-    : <>Downgrade <strong>{selectedTenant?.name}</strong> from <strong>{currentPlanName}</strong> to <strong>{newPlan.name}</strong> from <strong>{effectiveFrom}</strong>? No credits are added or removed now. Current balance <strong>{currentBalance.toLocaleString()}</strong> is unchanged.</>;
-
-  function handleConfirm() {
-    const msg = changeType === 'Initial Assignment'
-      ? `${newPlan.name} assigned to ${selectedTenant?.name}.`
-      : changeType === 'Upgrade'
-      ? `${selectedTenant?.name} upgraded to ${newPlan.name}.`
-      : `${selectedTenant?.name} downgraded to ${newPlan.name} from ${effectiveFrom}.`;
-    toast.success('Plan updated', { description: msg });
-    onClose();
-  }
-
-  const modalTitle =
-    step === 'confirm' ? 'Confirm Plan Change'
-    : step === 'failure' ? 'Update Failed'
-    : 'Assign / Change Plan';
-
-  return (
-    <Modal
-      open
-      onOpenChange={(v) => { if (!v) onClose(); }}
-      title={modalTitle}
-      size="md"
-      footer={
-        step === 'form' ? (
-          <div className="flex w-full items-center justify-between">
-            <Button variant="secondary" onClick={onClose}>Cancel</Button>
-            <Button onClick={() => setStep('confirm')} disabled={!canAssign}>Review & Confirm</Button>
-          </div>
-        ) : step === 'confirm' ? (
-          <div className="flex w-full items-center justify-between">
-            <Button variant="secondary" onClick={() => setStep('form')}>Back</Button>
-            <Button onClick={handleConfirm}>Confirm</Button>
-          </div>
-        ) : (
-          <div className="flex justify-end">
-            <Button onClick={onClose}>Close</Button>
-          </div>
-        )
-      }
-    >
-      {/* ── Failure ── */}
-      {step === 'failure' && (
-        <div className="flex flex-col items-center gap-3 py-6 text-center">
-          <div className="flex size-12 items-center justify-center rounded-full bg-red-50">
-            <AlertTriangle className="size-6 text-red-500" />
-          </div>
-          <p className="text-[15px] font-semibold text-[#111827]">Credits could not be updated. Please try again.</p>
-        </div>
-      )}
-
-      {/* ── Confirmation step ── */}
-      {step === 'confirm' && (
-        <div className="space-y-3">
-          <div className={`rounded-xl border px-4 py-3.5 text-sm leading-relaxed ${
-            changeType === 'Downgrade'
-              ? 'border-amber-200 bg-amber-50 text-amber-900'
-              : 'border-blue-100 bg-[#EBF3FF] text-[#1254C7]'
-          }`}>
-            {confirmationMessage}
-          </div>
-          <div className="rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] divide-y divide-[#F3F4F6]">
-            {[
-              { label: 'Tenant', value: selectedTenant?.name },
-              { label: 'Change Type', value: (
-                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${changeTypeBadge}`}>
-                  {changeType}
-                </span>
-              )},
-              { label: 'Effective From', value: effectiveFrom },
-              { label: 'Done By', value: `${doneBy} · ${dateTime}` },
-            ].map(row => (
-              <div key={row.label} className="flex items-center justify-between px-4 py-2.5 text-sm">
-                <span className="text-[#6B7280]">{row.label}</span>
-                <span className="font-medium text-[#111827]">{row.value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── Form step ── */}
-      {step === 'form' && (
-        <div className="space-y-4">
-
-          {/* Tenant */}
-          <FormField label="Tenant" required>
-            {({ id }) => (
-              <SelectInput id={id} value={tenantId} options={tenantOptions}
-                onChange={e => setTenantId(e.target.value)} />
-            )}
-          </FormField>
-
-          {/* Current Plan + New Plan side by side */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <p className="mb-1 text-[13px] font-medium text-[#374151]">Current Plan</p>
-              <div className="rounded-lg border border-[#E5E7EB] bg-[#F3F4F6] px-3 py-2.5 text-sm text-[#6B7280] min-h-[38px]">
-                {currentPlanName ?? <span className="italic text-[#9CA3AF]">No plan assigned</span>}
-              </div>
-            </div>
-            <FormField label="New Plan" required>
-              {({ id }) => (
-                <SelectInput
-                  id={id}
-                  value={newPlanId}
-                  options={
-                    newPlanOptions.length > 0
-                      ? newPlanOptions
-                      : [{ value: '', label: 'No other plans available' }]
-                  }
-                  onChange={e => setNewPlanId(e.target.value)}
-                  disabled={!tenantId || newPlanOptions.length === 0}
-                />
-              )}
-            </FormField>
-          </div>
-
-          {/* Auto-computed summary — shown once tenant is selected */}
-          {tenantId && (
-            <div className="rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-3 space-y-3">
-
-              {/* Change Type + Effective From inline */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-[13px] text-[#6B7280]">Change Type</span>
-                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${changeTypeBadge}`}>
-                    {changeType}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 text-[13px]">
-                  <span className="text-[#9CA3AF]">Effective</span>
-                  <span className="font-medium text-[#374151]">{effectiveFrom}</span>
-                </div>
-              </div>
-
-              {/* Credits Impact inline */}
-              <div className="flex items-center justify-between border-t border-[#E5E7EB] pt-3">
-                <div className="space-y-0.5">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#9CA3AF]">Credits added now</p>
-                  <p className={`text-base font-bold tabular-nums ${creditsAddedNow > 0 ? 'text-green-700' : 'text-[#6B7280]'}`}>
-                    {changeType === 'Downgrade' ? '—' : `+${creditsAddedNow.toLocaleString()}`}
-                  </p>
-                </div>
-                <div className="h-8 w-px bg-[#E5E7EB]" />
-                <div className="space-y-0.5 text-right">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#9CA3AF]">Balance after</p>
-                  <p className="text-base font-bold text-[#1565F0] tabular-nums">
-                    {balanceAfter.toLocaleString()}
-                  </p>
-                </div>
-              </div>
-
-              {changeType === 'Downgrade' && (
-                <p className="text-[12px] text-amber-600 border-t border-[#E5E7EB] pt-2">
-                  Reduction takes effect at next allocation ({effectiveFrom}). Current balance unchanged.
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Remarks */}
-          <FormField label="Remarks / Reference">
-            {({ id }) => (
-              <TextArea id={id} rows={2} value={remarks}
-                onChange={e => setRemarks(e.target.value)}
-                placeholder="e.g. Requested by Org Admin via REF-20261023" />
-            )}
-          </FormField>
-
-
-        </div>
-      )}
     </Modal>
   );
 }
@@ -401,7 +150,6 @@ export default function PlanManagementPage() {
   const [plans, setPlans] = useState<Plan[]>(MOCK_PLANS);
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Plan | null>(null);
-  const [assignTarget, setAssignTarget] = useState<Plan | null>(null);
   const [deleteBlockedPlan, setDeleteBlockedPlan] = useState<Plan | null>(null);
   const [deletePlan, setDeletePlan] = useState<Plan | null>(null);
   const [togglePlan, setTogglePlan] = useState<Plan | null>(null);
@@ -549,7 +297,7 @@ export default function PlanManagementPage() {
               ),
             },
             {
-              key: 'interval', header: 'Billing',
+              key: 'interval', header: 'Allocation Interval',
               cell: r => (
                 <span className="rounded-full bg-[#EBF3FF] px-2.5 py-1 text-xs font-semibold text-[#1254C7]">
                   {r.interval}
@@ -557,7 +305,7 @@ export default function PlanManagementPage() {
               ),
             },
             {
-              key: 'credits', header: 'Credits / Period', align: 'right',
+              key: 'credits', header: 'Credits', align: 'right',
               cell: r => (
                 <div className="text-right">
                   <p className="font-bold text-[#111827] text-sm tabular-nums">{r.credits.toLocaleString()}</p>
@@ -593,11 +341,6 @@ export default function PlanManagementPage() {
                       icon={<Pencil className="size-4" />}
                       onClick={() => setEditTarget(r)} />
                   </Tooltip>
-                  <Tooltip content="Assign / Change Plan">
-                    <IconButton variant="table" tone="primary" size="sm" label="Assign / Change Plan"
-                      icon={<ArrowLeftRight className="size-4" />}
-                      onClick={() => setAssignTarget(r)} />
-                  </Tooltip>
                   <Tooltip content={r.status === 'active' ? 'Deactivate' : 'Activate'}>
                     <IconButton variant="table" tone={r.status === 'active' ? 'danger' : 'success'} size="sm"
                       label={r.status === 'active' ? 'Deactivate' : 'Activate'}
@@ -623,9 +366,6 @@ export default function PlanManagementPage() {
       {/* Modals */}
       {createOpen && <PlanModal open onClose={handleCreate} />}
       {editTarget && <PlanModal open onClose={handleEdit} initial={editTarget} />}
-      {assignTarget && (
-        <AssignPlanModal plan={assignTarget} plans={plans} onClose={() => setAssignTarget(null)} />
-      )}
       {togglePlan && (
         <Modal open onOpenChange={open => { if (!open) setTogglePlan(null); }}
           title={togglePlan.status === 'active' ? 'Deactivate Plan?' : 'Activate Plan?'}
