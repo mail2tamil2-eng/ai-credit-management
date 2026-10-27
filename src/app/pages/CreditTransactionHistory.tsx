@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useRole } from '../context/RoleContext';
 import { Download } from 'lucide-react';
 import { Button, DataTable, Pagination } from '../components/saas';
 import { MOCK_TRANSACTIONS, MOCK_ACTIONS } from './creditTypes';
@@ -71,8 +72,9 @@ function ActionTab() {
   );
 }
 
-export default function CreditTransactionHistory({ tenantName, currentBalance: tenantBalance, showSummary = true }: { tenantName?: string; currentBalance?: number; showSummary?: boolean }) {
+export default function CreditTransactionHistory({ tenantName, currentBalance: tenantBalance, showSummary = true, showTitle = true }: { tenantName?: string; currentBalance?: number; showSummary?: boolean; showTitle?: boolean }) {
   const [tab, setTab] = useState<'transactions' | 'actions'>('transactions');
+  const isOrgAdmin = useRole().role === 'org-admin';
   // History is ordered newest first; its latest closing balance is the current balance.
   const currentBalance = MOCK_TRANSACTIONS[0]?.balanceAfter ?? tenantBalance;
 
@@ -93,19 +95,19 @@ export default function CreditTransactionHistory({ tenantName, currentBalance: t
         )}
       </div>}
       <div className="flex flex-wrap items-center justify-between gap-3">
-      <div className="flex gap-1 rounded-xl bg-[#F3F4F6] p-1 w-fit">
+      {isOrgAdmin ? (showTitle ? <h3 className="text-sm font-semibold text-[#111827]">Transaction History</h3> : <span />) : <div className="flex gap-1 rounded-xl bg-[#F3F4F6] p-1 w-fit">
         {(['transactions', 'actions'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`rounded-lg px-4 py-1.5 text-sm font-medium capitalize transition-all ${tab === t ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6B7280] hover:text-[#374151]'}`}>
             {t === 'transactions' ? 'Transaction History' : 'Action History'}
           </button>
         ))}
-      </div>
-      {tab === 'transactions' && (
+      </div>}
+      {(isOrgAdmin || tab === 'transactions') && (
         <Button variant="secondary" size="sm" leftIcon={<Download className="size-3.5" />}>Export CSV</Button>
       )}
       </div>
-      {tab === 'transactions' ? <TransactionTab /> : <ActionTab />}
+      {isOrgAdmin || tab === 'transactions' ? <TransactionTab /> : <ActionTab />}
     </div>
   );
 }

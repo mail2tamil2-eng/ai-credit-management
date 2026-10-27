@@ -11,20 +11,29 @@ import { MOCK_PLANS } from './creditTypes';
 const INTERVALS: PlanInterval[] = ['Monthly', 'Yearly'];
 
 // ── Plan Create / Edit Modal ───────────────────────────────────────────────────
-function PlanModal({ open, onClose, initial }: {
+function PlanModal({ open, onClose, initial, plans }: {
   open: boolean;
   onClose: (saved?: Plan) => void;
   initial?: Plan;
+  plans: Plan[];
 }) {
   const [name, setName] = useState(initial?.name ?? '');
   const [interval, setInterval] = useState<PlanInterval>(initial?.interval ?? 'Monthly');
   const [credits, setCredits] = useState(String(initial?.credits ?? ''));
   const [description, setDescription] = useState(initial?.description ?? '');
+  const [confirmCredits, setConfirmCredits] = useState(false);
   const creditsNum = Number(credits);
-  const valid = name.trim() && creditsNum > 0;
+  const normalizeName = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
+  const duplicateName = !!name.trim() && plans.some(plan =>
+    plan.id !== initial?.id && normalizeName(plan.name) === normalizeName(name));
+  const valid = !!name.trim() && !duplicateName && Number.isFinite(creditsNum) && creditsNum > 0;
 
   function handleSave() {
     if (!valid) return;
+    if (initial && creditsNum !== initial.credits && !confirmCredits) {
+      setConfirmCredits(true);
+      return;
+    }
     onClose({
       id: initial?.id ?? `p${Date.now()}`,
       name: name.trim(),
@@ -35,6 +44,25 @@ function PlanModal({ open, onClose, initial }: {
       assignedTenants: initial?.assignedTenants ?? 0,
     });
   }
+
+  if (confirmCredits && initial) return (
+    <Modal open={open} onOpenChange={value => { if (!value) onClose(); }}
+      title="Confirm Credit Change" size="sm"
+      footer={<div className="flex w-full items-center justify-between">
+        <Button variant="secondary" onClick={() => setConfirmCredits(false)}>Back</Button>
+        <Button onClick={handleSave} disabled={!valid}>Confirm Changes</Button>
+      </div>}>
+      <div className="space-y-4">
+        <p className="text-sm text-[#374151]">
+          This plan is used by <strong>{initial.assignedTenants} tenants</strong>. The change applies from their next allocation.
+        </p>
+        <div className="flex items-center justify-between rounded-lg bg-[#F9FAFB] px-4 py-3 text-sm">
+          <span className="font-medium text-[#374151]">Credits</span>
+          <span className="font-semibold tabular-nums text-[#111827]">{initial.credits.toLocaleString()} → {creditsNum.toLocaleString()}</span>
+        </div>
+      </div>
+    </Modal>
+  );
 
   return (
     <Modal
@@ -52,7 +80,8 @@ function PlanModal({ open, onClose, initial }: {
       }
     >
       <div className="flex flex-col gap-4">
-        <FormField label="Plan Name" required hint="Must be unique across all plans">
+        <FormField label="Plan Name" required hint="Must be unique across all plans"
+          error={duplicateName ? 'A plan with this name already exists. Enter a different name.' : undefined}>
           {({ id, describedBy, invalid }) => (
             <TextInput id={id} aria-describedby={describedBy} invalid={invalid}
               value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Growth" />
@@ -364,8 +393,8 @@ export default function PlanManagementPage() {
       </div>
 
       {/* Modals */}
-      {createOpen && <PlanModal open onClose={handleCreate} />}
-      {editTarget && <PlanModal open onClose={handleEdit} initial={editTarget} />}
+      {createOpen && <PlanModal open onClose={handleCreate} plans={plans} />}
+      {editTarget && <PlanModal open onClose={handleEdit} initial={editTarget} plans={plans} />}
       {togglePlan && (
         <Modal open onOpenChange={open => { if (!open) setTogglePlan(null); }}
           title={togglePlan.status === 'active' ? 'Deactivate Plan?' : 'Activate Plan?'}

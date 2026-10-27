@@ -6,6 +6,7 @@ import {
   Tooltip, PageHeader, StatWidget, DropdownMenu, IconButton, TextInput, TextArea, SelectInput,
 } from '../components/saas';
 import { Switch } from '../components/ui/switch';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 import { CreditStatusBadge } from '../components/CreditStatusBadge';
 import type { TenantCredit, CreditStatus } from './creditTypes';
 import { MOCK_TENANTS, MOCK_PLANS, MOCK_TRANSACTIONS, AVAILABLE_TENANTS } from './creditTypes';
@@ -155,7 +156,7 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
       onOpenChange={(v) => { if (!v) onClose(); }}
       title={tenant ? tenant.name : "Assign Tenant Credits"}
       description={tenant ? "Update tenant details, plan and credit settings." : "Set up a new tenant with a plan and opening credit balance."}
-      size="sm"
+      size="lg"
       footer={
         <div className="flex w-full items-center justify-between">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
@@ -163,8 +164,7 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
         </div>
       }
     >
-      <div className="space-y-4">
-
+      <div className="space-y-6">
         {/* Tenant name */}
         {!tenant && <FormField label="Tenant Name" required error={nameError}>
           {({ id }) => (
@@ -180,17 +180,52 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
           )}
         </FormField>}
 
+
+        <section aria-labelledby="tenant-plan-heading" className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 id="tenant-plan-heading" className="text-sm font-semibold text-[#111827]">Plan and credits</h3>
+            {tenant && (
+              <span className="inline-flex flex-wrap items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs">
+                <span className="text-[#6B7280]">Current plan:</span>
+                <span className="font-semibold text-[#374151]">{tenant.plan ?? 'No plan assigned'}</span>
+              </span>
+            )}
+          </div>
         {/* Plan */}
-        {tenant && <div>
-          <p className="mb-1 text-[13px] font-medium text-[#374151]">Current Plan</p>
-          <p className="rounded-lg border border-[#E5E7EB] bg-[#F3F4F6] px-3 py-2.5 text-sm text-[#6B7280]">{tenant.plan ?? 'No plan assigned'}</p>
-        </div>}
+        <div className={tenant ? 'grid grid-cols-1 items-start gap-4 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]' : ''}>
         <FormField label={tenant ? 'New Plan' : 'Plan'}>
           {({ id }) => (
             <SelectInput id={id} value={planId} options={planOptions} disabled={suspended}
               onChange={e => setPlanId(e.target.value)} />
           )}
         </FormField>
+        {tenant && <FormField label="Top-up Credits" hint="Optional — added immediately on top of plan allocation.">
+          {({ id }) => (
+            <TextInput id={id} type="number" min={0} disabled={suspended} placeholder="e.g. 500"
+              value={topUp} onChange={e => { setTopUp(e.target.value); if (!e.target.value) setRefError(''); }} />
+          )}
+        </FormField>}
+        </div>
+
+
+        {/* Top-up */}
+        {!tenant && <FormField label="Top-up Credits" hint="Optional — added immediately on top of plan allocation.">
+          {({ id }) => (
+            <TextInput id={id} type="number" min={0} disabled={suspended} placeholder="e.g. 500"
+              value={topUp} onChange={e => { setTopUp(e.target.value); if (!e.target.value) setRefError(''); }} />
+          )}
+        </FormField>}
+
+        {extraCredits > 0 && (
+          <FormField label="Reference" required error={refError}>
+            {({ id, describedBy, invalid }) => (
+              <TextInput id={id} aria-describedby={describedBy} invalid={invalid}
+                placeholder="e.g. REF-20261022"
+                value={reference} onChange={e => { setReference(e.target.value); if (e.target.value) setRefError(''); }} />
+            )}
+          </FormField>
+        )}
+
 
         {/* Allocation info — only when a plan is chosen */}
         {tenant ? impactSummary : selectedPlan && (
@@ -202,6 +237,18 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
           </div>
         )}
 
+
+        {/* Opening balance summary */}
+        {!tenant && <div className="flex items-center justify-between rounded-lg bg-[#F9FAFB] border border-[#E5E7EB] px-4 py-3">
+          <span className="text-[13px] font-semibold text-[#374151]">{tenant ? "Balance after saving" : "Opening balance"}</span>
+          <span className="text-base font-bold text-[#1565F0] tabular-nums">
+            {openingBalance.toLocaleString()} <span className="text-xs font-semibold text-[#6B7280]">credits</span>
+          </span>
+        </div>}
+
+        </section>
+        <section aria-labelledby="tenant-allocation-heading" className="space-y-4 border-t border-[#E5E7EB] pt-5">
+          <h3 id="tenant-allocation-heading" className="text-sm font-semibold text-[#111827]">Allocation settings</h3>
         {/* Rollover */}
         <div className="flex items-center justify-between">
           <label htmlFor="rollover-switch" className="text-[13px] font-semibold text-[#374151] cursor-pointer">
@@ -214,12 +261,12 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
         <Checkbox label="Allow Org Admin to Stop Credit Allocation"
           className="[&>span:last-child]:text-[#374151] [&>span:last-child]:font-normal"
           checked={allowOrgAdminStopAllocation} onChange={setAllowOrgAdminStopAllocation} />
-
-        <div className="h-px bg-[#F3F4F6]" />
-
+        </section>
+        <section aria-labelledby="tenant-alerts-heading" className="space-y-3 border-t border-[#E5E7EB] pt-5">
+          <h3 id="tenant-alerts-heading" className="text-sm font-semibold text-[#111827]">Credit alerts</h3>
         {/* Credit alert thresholds */}
         <div>
-          <div className="flex gap-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Low Credit Threshold">
               {({ id }) => (
                 <div className="relative">
@@ -254,47 +301,20 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
           </p>
           {thresholdError && <p className="mt-1.5 text-xs text-red-600">{thresholdError}</p>}
         </div>
-
-        <div className="h-px bg-[#F3F4F6]" />
-
-        {/* Top-up */}
-        <FormField label="Top-up Credits" hint="Optional — added immediately on top of plan allocation.">
-          {({ id }) => (
-            <TextInput id={id} type="number" min={0} disabled={suspended} placeholder="e.g. 500"
-              value={topUp} onChange={e => { setTopUp(e.target.value); if (!e.target.value) setRefError(''); }} />
-          )}
-        </FormField>
-
-        {extraCredits > 0 && (
-          <FormField label="Reference" required error={refError}>
-            {({ id, describedBy, invalid }) => (
-              <TextInput id={id} aria-describedby={describedBy} invalid={invalid}
-                placeholder="e.g. REF-20261022"
-                value={reference} onChange={e => { setReference(e.target.value); if (e.target.value) setRefError(''); }} />
-            )}
-          </FormField>
-        )}
-
-        {/* Opening balance summary */}
-        {!tenant && <div className="flex items-center justify-between rounded-lg bg-[#F9FAFB] border border-[#E5E7EB] px-4 py-3">
-          <span className="text-[13px] font-semibold text-[#374151]">{tenant ? "Balance after saving" : "Opening balance"}</span>
-          <span className="text-base font-bold text-[#1565F0] tabular-nums">
-            {openingBalance.toLocaleString()} <span className="text-xs font-semibold text-[#6B7280]">credits</span>
-          </span>
-        </div>}
-
+        </section>
       </div>
     </Modal>
   );
 }
 
 // ── Top-up Modal ──────────────────────────────────────────────────────────────
-function TopUpModal({ tenant, onClose }: { tenant: TenantCredit; onClose: () => void }) {
+function TopUpModal({ tenant, onClose, onConfirm }: { tenant: TenantCredit; onClose: () => void; onConfirm: (amount: number, reference: string) => void }) {
   const [credits, setCredits] = useState('');
   const [reference, setReference] = useState('');
   const [confirmed, setConfirmed] = useState(false);
   const amount = Number(credits);
   const newBalance = tenant.balance + amount;
+  const valid = Number.isFinite(amount) && amount > 0 && Number.isFinite(newBalance) && !!reference.trim();
 
   if (confirmed && amount > 0) {
     return (
@@ -302,7 +322,7 @@ function TopUpModal({ tenant, onClose }: { tenant: TenantCredit; onClose: () => 
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setConfirmed(false)}>Back</Button>
-            <Button onClick={onClose}>Add Credits</Button>
+            <Button disabled={!valid} onClick={() => { if (valid) onConfirm(amount, reference.trim()); }}>Add Credits</Button>
           </div>
         }>
         <div className="space-y-3 text-sm">
@@ -324,15 +344,22 @@ function TopUpModal({ tenant, onClose }: { tenant: TenantCredit; onClose: () => 
       footer={
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button disabled={amount <= 0 || !reference.trim()} onClick={() => setConfirmed(true)}>Continue</Button>
+          <Button disabled={!valid} onClick={() => setConfirmed(true)}>Continue</Button>
         </div>
       }>
       <div className="space-y-4">
-        <div className="rounded-xl bg-[#EBF3FF] px-4 py-3 text-sm flex items-center justify-between">
-          <span className="text-[#6B7280]">Tenant</span>
-          <span className="font-semibold text-[#111827]">{tenant.name}</span>
-          <span className="text-xs text-[#9CA3AF]">Balance: {tenant.balance.toLocaleString()}</span>
-        </div>
+        <dl className="flex flex-wrap items-start justify-between gap-4 border-b border-[#E5E7EB] pb-4">
+          <div>
+            <dt className="text-xs text-[#6B7280]">Tenant</dt>
+            <dd className="mt-1 text-base font-semibold text-[#111827]">{tenant.name}</dd>
+          </div>
+          <div className="text-right">
+            <dt className="text-xs text-[#6B7280]">Current balance</dt>
+            <dd className={`mt-1 text-base font-semibold tabular-nums ${tenant.balance < 0 ? 'text-red-600' : 'text-[#111827]'}`}>
+              {tenant.balance.toLocaleString()} <span className="text-xs font-normal text-[#6B7280]">credits</span>
+            </dd>
+          </div>
+        </dl>
         <FormField label="Credits to Add" required hint="Enter a positive number">
           {({ id }) => (
             <input id={id} type="number" min={1}
@@ -382,12 +409,97 @@ const DETAIL_FEATURES = [
 ];
 const DETAIL_FEATURE_COLORS = ['#1565F0', '#8B5CF6', '#059669'];
 
+// Prototype activity rows from the supplied reference.
+const ORG_RECENT_ACTIVITY = [
+  {
+    "id": "activity-0",
+    "date": "22 Sept, 14:17",
+    "user": "Company Manager",
+    "module": "Roleplay",
+    "feature": "Chat",
+    "credits": 0.66
+  },
+  {
+    "id": "activity-1",
+    "date": "22 Sept, 14:16",
+    "user": "Company Manager",
+    "module": "Roleplay",
+    "feature": "Chat",
+    "credits": 0.83
+  },
+  {
+    "id": "activity-2",
+    "date": "22 Sept, 14:16",
+    "user": "Company Manager",
+    "module": "Roleplay",
+    "feature": "Chat",
+    "credits": 0.88
+  },
+  {
+    "id": "activity-3",
+    "date": "22 Sept, 14:15",
+    "user": "Company Manager",
+    "module": "Roleplay",
+    "feature": "Chat",
+    "credits": 0.87
+  },
+  {
+    "id": "activity-4",
+    "date": "22 Sept, 14:14",
+    "user": "Company Manager",
+    "module": "Roleplay",
+    "feature": "Chat",
+    "credits": 0.88
+  },
+  {
+    "id": "activity-5",
+    "date": "22 Sept, 14:14",
+    "user": "Company Manager",
+    "module": "Roleplay",
+    "feature": "Chat",
+    "credits": 0.82
+  },
+  {
+    "id": "activity-6",
+    "date": "22 Sept, 14:13",
+    "user": "Company Manager",
+    "module": "Roleplay",
+    "feature": "Chat",
+    "credits": 0.77
+  },
+  {
+    "id": "activity-7",
+    "date": "22 Sept, 14:13",
+    "user": "Company Manager",
+    "module": "Roleplay",
+    "feature": "Chat",
+    "credits": 0.68
+  },
+  {
+    "id": "activity-8",
+    "date": "22 Sept, 14:13",
+    "user": "Company Manager",
+    "module": "Roleplay",
+    "feature": "Chat",
+    "credits": 0.63
+  },
+  {
+    "id": "activity-9",
+    "date": "22 Sept, 14:12",
+    "user": "Company Manager",
+    "module": "Roleplay",
+    "feature": "Chat",
+    "credits": 0.67
+  }
+];
+
 function TenantDetailView({ tenant, onBack, onStopAllocation }: {
   tenant: TenantCredit;
   onBack?: () => void;
   onStopAllocation?: (reason: string) => void;
 }) {
   const [confirmStop, setConfirmStop] = useState(false);
+  const isOrgAdmin = useRole().role === 'org-admin';
   const [stopReason, setStopReason] = useState('');
   const canStop = !!onStopAllocation && !!tenant.allowOrgAdminStopAllocation
     && !!tenant.plan && tenant.allocationStatus === 'active' && tenant.tenantStatus === 'active';
@@ -497,7 +609,7 @@ function TenantDetailView({ tenant, onBack, onStopAllocation }: {
       </div>
 
       {/* Usage + Activity — 2 columns */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className={isOrgAdmin ? "space-y-4" : "grid grid-cols-2 gap-4"}>
         {/* Usage by Feature */}
         <div className="rounded-xl border border-[#E5E7EB] bg-white p-4">
           <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[#9CA3AF]">Usage by Feature</p>
@@ -527,7 +639,7 @@ function TenantDetailView({ tenant, onBack, onStopAllocation }: {
         </div>
 
         {/* Recent Activity */}
-        <div className="rounded-xl border border-[#E5E7EB] bg-white p-4">
+        {!isOrgAdmin && <div className="rounded-xl border border-[#E5E7EB] bg-white p-4">
           <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[#9CA3AF]">Recent Activity</p>
           <div>
             {MOCK_TRANSACTIONS.slice(0, 5).map((t, i) => (
@@ -543,11 +655,31 @@ function TenantDetailView({ tenant, onBack, onStopAllocation }: {
               </div>
             ))}
           </div>
-        </div>
+        </div>}
       </div>
 
       <section aria-label="Tenant history" className="rounded-xl border border-[#E5E7EB] bg-white p-4">
-        <CreditTransactionHistory showSummary={false} />
+        {isOrgAdmin ? (
+          <Tabs defaultValue="activity" className="gap-4">
+            <TabsList aria-label="Credit activity and history" className="bg-[#F3F4F6]">
+              <TabsTrigger value="activity" className="px-4 data-[state=active]:shadow-sm">Recent Activity</TabsTrigger>
+              <TabsTrigger value="transactions" className="px-4 data-[state=active]:shadow-sm">Transaction History</TabsTrigger>
+            </TabsList>
+            <TabsContent value="activity">
+            <DataTable rows={ORG_RECENT_ACTIVITY} rowKey={row => row.id} density="compact" columns={[
+              { key: 'date', header: 'Date' },
+              { key: 'user', header: 'User' },
+              { key: 'module', header: 'Module' },
+              { key: 'feature', header: 'Feature' },
+              { key: 'credits', header: 'Credits', align: 'right', cell: row => <span className="rounded-full bg-cyan-700 px-2 py-0.5 text-xs font-semibold tabular-nums text-white">{row.credits.toFixed(2)}</span> },
+            ]} />
+
+            </TabsContent>
+            <TabsContent value="transactions">
+              <CreditTransactionHistory showSummary={false} showTitle={false} />
+            </TabsContent>
+          </Tabs>
+        ) : <CreditTransactionHistory showSummary={false} />}
       </section>
     </div>
   );
@@ -610,7 +742,7 @@ export default function TenantCreditPage() {
     return <TenantDetailView key={`org-${ownTenant.id}`} tenant={ownTenant} onStopAllocation={reason => {
       if (!ownTenant.allowOrgAdminStopAllocation || !ownTenant.plan || ownTenant.tenantStatus !== 'active' || ownTenant.allocationStatus !== 'active' || !reason.trim()) return;
       setTenants(previous => previous.map(t => t.id === ownTenant.id
-        ? { ...t, allocationStatus: 'inactive', nextAllocation: 'Paused', allocationStopReason: reason }
+        ? { ...t, allocationStatus: 'inactive', pausedNextAllocation: t.nextAllocation, nextAllocation: 'Paused', allocationStopReason: reason }
         : t));
       toast.success('Plan inactivated', { description: 'Future credit allocations have stopped. Your existing credits remain available.' });
     }} />;
@@ -815,6 +947,7 @@ export default function TenantCreditPage() {
               key: 'actions' as keyof TenantCredit, header: '', align: 'right',
               cell: r => {
                 const suspended = r.tenantStatus === 'suspended';
+                const allocationInactive = r.allocationStatus === 'inactive';
                 return (
                   <div className="flex items-center justify-end gap-0.5">
                     <Tooltip content={suspended ? 'Unavailable for suspended tenants' : 'Top-up Credits'}>
@@ -827,10 +960,10 @@ export default function TenantCreditPage() {
                         icon={<Pencil className="size-4" />}
                         onClick={() => setEditTenant(r)} />
                     </Tooltip>
-                    <Tooltip content={suspended ? 'Activate' : 'Deactivate'}>
-                      <IconButton variant="table" tone={suspended ? 'success' : 'danger'} size="sm"
-                        label={suspended ? 'Activate' : 'Deactivate'}
-                        icon={suspended ? <Power className="size-4" /> : <Ban className="size-4" />}
+                    <Tooltip content={allocationInactive ? 'Activate Allocation' : 'Deactivate Allocation'}>
+                      <IconButton variant="table" tone={allocationInactive ? 'success' : 'danger'} size="sm"
+                        label={allocationInactive ? 'Activate Allocation' : 'Deactivate Allocation'}
+                        icon={allocationInactive ? <Power className="size-4" /> : <Ban className="size-4" />}
                         onClick={() => setConfirmToggleTenant(r)} />
                     </Tooltip>
                   </div>
@@ -843,6 +976,7 @@ export default function TenantCreditPage() {
               onPageChange={setPage} itemLabel="tenants" />
           }
         />
+
       </div>
 
       {/* Modals */}
@@ -860,44 +994,62 @@ export default function TenantCreditPage() {
         />
       )}
       {topUpTenant && (
-        <TopUpModal tenant={topUpTenant} onClose={() => { setTopUpTenant(null); toast.success('Credits added', { description: `Top-up applied to ${topUpTenant.name}.` }); }} />
+        <TopUpModal tenant={topUpTenant} onClose={() => setTopUpTenant(null)}
+          onConfirm={(amount, reference) => {
+            if (!Number.isFinite(amount) || amount <= 0 || !reference.trim() || topUpTenant.tenantStatus !== 'active') return;
+            setTenants(previous => previous.map(tenant => {
+              if (tenant.id !== topUpTenant.id) return tenant;
+              const balance = tenant.balance + amount;
+              const planCredits = MOCK_PLANS.find(plan => tenant.plan === `${plan.name} (${plan.interval})`)?.credits ?? 0;
+              const percentage = planCredits > 0 ? balance / planCredits * 100 : Infinity;
+              const creditStatus: CreditStatus = balance < 0 ? 'negative' : balance === 0 ? 'exhausted'
+                : percentage <= (tenant.criticalThreshold ?? 10) ? 'critical'
+                : percentage <= (tenant.lowThreshold ?? 20) ? 'low' : 'active';
+              return { ...tenant, balance, creditStatus, topUpReference: reference };
+            }));
+            toast.success('Credits added', { description: `${amount.toLocaleString()} credits added to ${topUpTenant.name}.` });
+            setTopUpTenant(null);
+          }} />
       )}
 
       {/* Activate / Deactivate confirmation */}
       {confirmToggleTenant && (() => {
-        const isSuspended = confirmToggleTenant.tenantStatus === 'suspended';
+        const isInactive = confirmToggleTenant.allocationStatus === 'inactive';
         return (
           <Modal
             open
             onOpenChange={(v) => { if (!v) setConfirmToggleTenant(null); }}
-            title={isSuspended ? 'Activate Tenant?' : 'Deactivate Tenant?'}
+            title={isInactive ? 'Activate Credit Allocation?' : 'Deactivate Credit Allocation?'}
             size="sm"
-            tone={isSuspended ? undefined : 'warning'}
+            tone={isInactive ? undefined : 'warning'}
             footer={
               <div className="flex w-full items-center justify-between">
                 <Button variant="secondary" onClick={() => setConfirmToggleTenant(null)}>Cancel</Button>
                 <Button
-                  variant={isSuspended ? undefined : 'danger'}
+                  variant={isInactive ? undefined : 'danger'}
                   onClick={() => {
-                    const newStatus = isSuspended ? 'active' : 'suspended';
-                    setTenants(prev => prev.map(t => t.id === confirmToggleTenant.id ? { ...t, tenantStatus: newStatus } : t));
+                    const newStatus = isInactive ? 'active' : 'inactive';
+                    setTenants(prev => prev.map(t => t.id === confirmToggleTenant.id ? { ...t, allocationStatus: newStatus,
+                      pausedNextAllocation: isInactive ? undefined : t.nextAllocation,
+                      nextAllocation: isInactive ? (t.pausedNextAllocation ?? (t.plan ? (t.plan.includes('(Yearly)') ? '01 Oct 2027' : '01 Nov 2026') : undefined)) : 'Paused'
+                    } : t));
                     setConfirmToggleTenant(null);
-                    if (isSuspended) {
-                      toast.success('Tenant activated', { description: `${confirmToggleTenant.name} is now active.` });
+                    if (isInactive) {
+                      toast.success('Credit allocation activated', { description: `Future credit allocations for ${confirmToggleTenant.name} will resume.` });
                     } else {
-                      toast.warning('Tenant deactivated', { description: `${confirmToggleTenant.name} has been suspended.` });
+                      toast.success('Credit allocation deactivated', { description: `Future allocations for ${confirmToggleTenant.name} are paused. Existing credits remain available.` });
                     }
                   }}
                 >
-                  {isSuspended ? 'Activate' : 'Deactivate'}
+                  {isInactive ? 'Activate' : 'Deactivate'}
                 </Button>
               </div>
             }
           >
             <p className="text-sm text-[#374151]">
-              {isSuspended
-                ? <>Are you sure you want to activate <strong>{confirmToggleTenant.name}</strong>? Their plan allocation will resume.</>
-                : <>Are you sure you want to deactivate <strong>{confirmToggleTenant.name}</strong>? Their plan allocation will be paused.</>}
+              {isInactive
+                ? <>Are you sure you want to resume credit allocation for <strong>{confirmToggleTenant.name}</strong>?</>
+                : <>Are you sure you want to stop credit allocation for <strong>{confirmToggleTenant.name}</strong>? Future allocations will pause. Existing credits remain available.</>}
             </p>
           </Modal>
         );

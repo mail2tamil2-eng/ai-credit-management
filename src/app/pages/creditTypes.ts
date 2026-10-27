@@ -19,6 +19,7 @@ export interface TenantCredit {
   tenantStatus: TenantStatus;
   plan?: string;
   nextAllocation?: string;
+  pausedNextAllocation?: string;
   balance: number;
   creditStatus: CreditStatus;
   allocationStatus: AllocationStatus;
