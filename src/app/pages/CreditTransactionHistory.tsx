@@ -72,7 +72,7 @@ function ActionTab() {
   );
 }
 
-export default function CreditTransactionHistory({ tenantName, currentBalance: tenantBalance, showSummary = true, showTitle = true }: { tenantName?: string; currentBalance?: number; showSummary?: boolean; showTitle?: boolean }) {
+export default function CreditTransactionHistory({ tenantName, currentBalance: tenantBalance, showSummary = true, showTitle = true, showToolbar = true }: { tenantName?: string; currentBalance?: number; showSummary?: boolean; showTitle?: boolean; showToolbar?: boolean }) {
   const [tab, setTab] = useState<'transactions' | 'actions'>('transactions');
   const isOrgAdmin = useRole().role === 'org-admin';
   // History is ordered newest first; its latest closing balance is the current balance.
@@ -94,7 +94,7 @@ export default function CreditTransactionHistory({ tenantName, currentBalance: t
           </p>
         )}
       </div>}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {showToolbar && <div className="flex flex-wrap items-center justify-between gap-3">
       {isOrgAdmin ? (showTitle ? <h3 className="text-sm font-semibold text-[#111827]">Transaction History</h3> : <span />) : <div className="flex gap-1 rounded-xl bg-[#F3F4F6] p-1 w-fit">
         {(['transactions', 'actions'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)}
@@ -106,7 +106,7 @@ export default function CreditTransactionHistory({ tenantName, currentBalance: t
       {(isOrgAdmin || tab === 'transactions') && (
         <Button variant="secondary" size="sm" leftIcon={<Download className="size-3.5" />}>Export CSV</Button>
       )}
-      </div>
+      </div>}
       {isOrgAdmin || tab === 'transactions' ? <TransactionTab /> : <ActionTab />}
     </div>
   );

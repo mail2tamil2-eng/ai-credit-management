@@ -500,6 +500,7 @@ function TenantDetailView({ tenant, onBack, onStopAllocation }: {
 }) {
   const [confirmStop, setConfirmStop] = useState(false);
   const isOrgAdmin = useRole().role === 'org-admin';
+  const [historyTab, setHistoryTab] = useState('activity');
   const [stopReason, setStopReason] = useState('');
   const canStop = !!onStopAllocation && !!tenant.allowOrgAdminStopAllocation
     && !!tenant.plan && tenant.allocationStatus === 'active' && tenant.tenantStatus === 'active';
@@ -660,11 +661,16 @@ function TenantDetailView({ tenant, onBack, onStopAllocation }: {
 
       <section aria-label="Tenant history" className="rounded-xl border border-[#E5E7EB] bg-white p-4">
         {isOrgAdmin ? (
-          <Tabs defaultValue="activity" className="gap-4">
+          <Tabs value={historyTab} onValueChange={setHistoryTab} className="gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
             <TabsList aria-label="Credit activity and history" className="bg-[#F3F4F6]">
               <TabsTrigger value="activity" className="px-4 data-[state=active]:shadow-sm">Recent Activity</TabsTrigger>
               <TabsTrigger value="transactions" className="px-4 data-[state=active]:shadow-sm">Transaction History</TabsTrigger>
             </TabsList>
+            {historyTab === 'transactions' && (
+              <Button variant="secondary" size="sm" leftIcon={<Download className="size-3.5" />}>Export CSV</Button>
+            )}
+            </div>
             <TabsContent value="activity">
             <DataTable rows={ORG_RECENT_ACTIVITY} rowKey={row => row.id} density="compact" columns={[
               { key: 'date', header: 'Date' },
@@ -676,7 +682,7 @@ function TenantDetailView({ tenant, onBack, onStopAllocation }: {
 
             </TabsContent>
             <TabsContent value="transactions">
-              <CreditTransactionHistory showSummary={false} showTitle={false} />
+              <CreditTransactionHistory showSummary={false} showTitle={false} showToolbar={false} />
             </TabsContent>
           </Tabs>
         ) : <CreditTransactionHistory showSummary={false} />}
