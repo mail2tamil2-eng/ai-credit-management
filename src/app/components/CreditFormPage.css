@@ -11,10 +11,14 @@
 /* Assignment layout responds to available content width, including the sidebar. */
 .credit-form-page:has(.tenant-allocation-form) { container-type: inline-size; }
 .tenant-allocation-form { min-width: 0; }
-.tenant-allocation-form :is(input:not([type="checkbox"]), select) { min-width: 0; width: 100%; border-bottom-color: #6B7280; }
+.tenant-allocation-form :is(input:not([type="checkbox"]), select) { min-width: 0; width: 100%; }
 .tenant-allocation-form section { min-width: 0; }
-@container (min-width: 850px) {
-  .allocation-columns { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+@container (min-width: 700px) {
+  .allocation-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .allocation-fields-edit { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (min-width: 551px) {
+  .allocation-settings-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @container (max-width: 550px) {
   .tenant-allocation-form .grid { grid-template-columns: minmax(0, 1fr); }

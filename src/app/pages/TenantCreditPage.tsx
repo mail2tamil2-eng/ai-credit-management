@@ -191,7 +191,7 @@ export function TenantCreditsFormPage({ tenant, onClose, onSave }: { tenant?: Te
       <div className="allocation-columns grid items-start gap-6">
         <section aria-labelledby="tenant-plan-heading" className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 id="tenant-plan-heading" className="text-sm font-semibold text-[#111827]">Tenant and allocation</h3>
+            <h3 id="tenant-plan-heading" className="text-sm font-semibold text-[#111827]">Plan and credits</h3>
             {tenant && (
               <span className="inline-flex flex-wrap items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs">
                 <span className="text-[#6B7280]">Current plan:</span>
@@ -199,6 +199,7 @@ export function TenantCreditsFormPage({ tenant, onClose, onSave }: { tenant?: Te
               </span>
             )}
           </div>
+        <div className={`allocation-fields grid items-start gap-4 ${tenant ? "allocation-fields-edit" : ""}`}>
         {/* Tenant name */}
         {!tenant && <FormField label="Tenant Name" required error={nameError}>
           {({ id, describedBy, invalid }) => (
@@ -217,7 +218,7 @@ export function TenantCreditsFormPage({ tenant, onClose, onSave }: { tenant?: Te
 
 
         {/* Plan */}
-        <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
+
         <FormField label={tenant ? 'New Plan' : 'Plan'}>
           {({ id }) => (
             <SelectInput id={id} value={planId} options={planOptions} disabled={suspended}
@@ -256,22 +257,23 @@ export function TenantCreditsFormPage({ tenant, onClose, onSave }: { tenant?: Te
 
 
         {/* Opening balance summary */}
-        {!tenant && <section aria-labelledby="opening-balance-title" className="rounded-lg bg-[#F9FAFB] border border-[#E5E7EB] px-4 py-4">
+        {!tenant && <section aria-labelledby="opening-balance-title" className="rounded-lg bg-[#F9FAFB] border border-[#E5E7EB] px-4 py-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h3 id="opening-balance-title" className="text-sm font-semibold text-[#374151]">Opening balance</h3>
-            <output aria-live="polite" aria-atomic="true" className="text-2xl font-bold text-[#111827] tabular-nums">
+            <output aria-live="polite" aria-atomic="true" className="text-base font-bold text-[#1565F0] tabular-nums">
               {validTopUp && !topUpError && Number.isFinite(openingBalance) ? openingBalance.toLocaleString() : '�'} <span className="text-sm font-normal text-[#6B7280]">credits</span>
             </output>
           </div>
-          <p className="mt-2 text-xs text-[#6B7280]">{planCredits.toLocaleString()} plan credits + {validTopUp && !topUpError ? extraCredits.toLocaleString() : '�'} top-up credits</p>
+          <p className="sr-only">{planCredits.toLocaleString()} plan credits + {validTopUp && !topUpError ? extraCredits.toLocaleString() : '�'} top-up credits</p>
         </section>}
 
         </section>
-        <div className="space-y-5 rounded-xl border border-[#E5E7EB] bg-[#FAFBFC] p-5">
-        <section aria-labelledby="tenant-allocation-heading" className="space-y-4">
+        <div className="space-y-6">
+        <section aria-labelledby="tenant-allocation-heading" className="space-y-4 border-t border-[#E5E7EB] pt-5">
           <h3 id="tenant-allocation-heading" className="text-sm font-semibold text-[#111827]">Allocation settings</h3>
+        <div className="allocation-settings-row grid items-center gap-4">
         {/* Rollover */}
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
           <label htmlFor="rollover-switch" className="text-[13px] font-semibold text-[#374151] cursor-pointer">
             Rollover unused credits
           </label>
@@ -282,6 +284,7 @@ export function TenantCreditsFormPage({ tenant, onClose, onSave }: { tenant?: Te
         <Checkbox label="Allow Org Admin to Deactivate Plan"
           className="[&>span:last-child]:text-[#374151] [&>span:last-child]:font-normal"
           checked={allowOrgAdminStopAllocation} onChange={setAllowOrgAdminStopAllocation} />
+        </div>
         </section>
         <section aria-labelledby="tenant-alerts-heading" className="space-y-3 border-t border-[#E5E7EB] pt-5">
           <h3 id="tenant-alerts-heading" className="text-sm font-semibold text-[#111827]">Credit alerts</h3>
