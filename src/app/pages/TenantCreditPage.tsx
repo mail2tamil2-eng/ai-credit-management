@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { CreditFormPage } from '../components/CreditFormPage';
 import { toast } from 'sonner';
 import { Download, AlertTriangle, Users, Layers, Zap, Activity, ChevronDown, ChevronRight, X, Plus, Building2, Info, Pencil, Ban, Power, ArrowLeft } from 'lucide-react';
 import {
@@ -14,8 +15,8 @@ import CreditTransactionHistory from './CreditTransactionHistory';
 import { ORG_ADMIN_TENANT_ID, useRole } from '../context/RoleContext';
 
 
-// ── Create Tenant Modal ────────────────────────────────────────────────────────
-function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit; onClose: () => void; onSave: (t: TenantCredit) => void }) {
+// ── Assign / Edit Tenant Page ────────────────────────────────────────────────────────
+function TenantCreditsFormPage({ tenant, onClose, onSave }: { tenant?: TenantCredit; onClose: () => void; onSave: (t: TenantCredit) => void }) {
   const currentPlan = MOCK_PLANS.find(p => tenant?.plan === `${p.name} (${p.interval})`);
   const suspended = tenant?.tenantStatus === 'suspended';
   const [name, setName] = useState(tenant?.name ?? '');
@@ -128,7 +129,7 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
   ];
 
   if (reviewing && tenant) return (
-    <Modal open onOpenChange={open => { if (!open) onClose(); }} title="Confirm Plan Change" size="sm"
+    <CreditFormPage onBack={() => setReviewing(false)} backLabel="Back to Edit Tenant Credits" onSubmit={handleSave} title="Confirm Plan Change"
       footer={<div className="flex w-full items-center justify-between">
         <Button variant="secondary" onClick={() => setReviewing(false)}>Back</Button>
         <Button onClick={handleSave}>Confirm</Button>
@@ -147,16 +148,16 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
           {extraCredits > 0 && <Row label="Reference" value={reference} />}
         </div>
       </div>
-    </Modal>
+    </CreditFormPage>
   );
 
   return (
-    <Modal
-      open
-      onOpenChange={(v) => { if (!v) onClose(); }}
-      title={tenant ? tenant.name : "Assign Tenant Credits"}
+    <CreditFormPage
+      onBack={onClose}
+      backLabel="Back to Credit Management"
+      onSubmit={handleSave}
+      title={tenant ? "Edit Tenant Credits — " + tenant.name : "Assign Tenant Credits"}
       description={tenant ? "Update tenant details, plan and credit settings." : "Set up a new tenant with a plan and opening credit balance."}
-      size="lg"
       footer={
         <div className="flex w-full items-center justify-between">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
@@ -164,7 +165,17 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
         </div>
       }
     >
-      <div className="space-y-6">
+      <div className="grid items-start gap-6 xl:grid-cols-2">
+        <section aria-labelledby="tenant-plan-heading" className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 id="tenant-plan-heading" className="text-sm font-semibold text-[#111827]">Plan and credits</h3>
+            {tenant && (
+              <span className="inline-flex flex-wrap items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs">
+                <span className="text-[#6B7280]">Current plan:</span>
+                <span className="font-semibold text-[#374151]">{tenant.plan ?? 'No plan assigned'}</span>
+              </span>
+            )}
+          </div>
         {/* Tenant name */}
         {!tenant && <FormField label="Tenant Name" required error={nameError}>
           {({ id }) => (
@@ -181,25 +192,15 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
         </FormField>}
 
 
-        <section aria-labelledby="tenant-plan-heading" className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 id="tenant-plan-heading" className="text-sm font-semibold text-[#111827]">Plan and credits</h3>
-            {tenant && (
-              <span className="inline-flex flex-wrap items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs">
-                <span className="text-[#6B7280]">Current plan:</span>
-                <span className="font-semibold text-[#374151]">{tenant.plan ?? 'No plan assigned'}</span>
-              </span>
-            )}
-          </div>
         {/* Plan */}
-        <div className={tenant ? 'grid grid-cols-1 items-start gap-4 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]' : ''}>
+        <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
         <FormField label={tenant ? 'New Plan' : 'Plan'}>
           {({ id }) => (
             <SelectInput id={id} value={planId} options={planOptions} disabled={suspended}
               onChange={e => setPlanId(e.target.value)} />
           )}
         </FormField>
-        {tenant && <FormField label="Top-up Credits" hint="Optional — added immediately on top of plan allocation.">
+        {<FormField label="Top-up Credits" hint="Optional — added immediately on top of plan allocation.">
           {({ id }) => (
             <TextInput id={id} type="number" min={0} disabled={suspended} placeholder="e.g. 500"
               value={topUp} onChange={e => { setTopUp(e.target.value); if (!e.target.value) setRefError(''); }} />
@@ -207,14 +208,6 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
         </FormField>}
         </div>
 
-
-        {/* Top-up */}
-        {!tenant && <FormField label="Top-up Credits" hint="Optional — added immediately on top of plan allocation.">
-          {({ id }) => (
-            <TextInput id={id} type="number" min={0} disabled={suspended} placeholder="e.g. 500"
-              value={topUp} onChange={e => { setTopUp(e.target.value); if (!e.target.value) setRefError(''); }} />
-          )}
-        </FormField>}
 
         {extraCredits > 0 && (
           <FormField label="Reference" required error={refError}>
@@ -247,7 +240,8 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
         </div>}
 
         </section>
-        <section aria-labelledby="tenant-allocation-heading" className="space-y-4 border-t border-[#E5E7EB] pt-5">
+        <div className="space-y-5 rounded-xl border border-[#E5E7EB] bg-[#FAFBFC] p-5">
+        <section aria-labelledby="tenant-allocation-heading" className="space-y-4">
           <h3 id="tenant-allocation-heading" className="text-sm font-semibold text-[#111827]">Allocation settings</h3>
         {/* Rollover */}
         <div className="flex items-center justify-between">
@@ -302,13 +296,14 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
           {thresholdError && <p className="mt-1.5 text-xs text-red-600">{thresholdError}</p>}
         </div>
         </section>
+        </div>
       </div>
-    </Modal>
+    </CreditFormPage>
   );
 }
 
 // ── Top-up Modal ──────────────────────────────────────────────────────────────
-function TopUpModal({ tenant, onClose, onConfirm }: { tenant: TenantCredit; onClose: () => void; onConfirm: (amount: number, reference: string) => void }) {
+function TopUpFormPage({ tenant, onClose, onConfirm }: { tenant: TenantCredit; onClose: () => void; onConfirm: (amount: number, reference: string) => void }) {
   const [credits, setCredits] = useState('');
   const [reference, setReference] = useState('');
   const [confirmed, setConfirmed] = useState(false);
@@ -318,7 +313,7 @@ function TopUpModal({ tenant, onClose, onConfirm }: { tenant: TenantCredit; onCl
 
   if (confirmed && amount > 0) {
     return (
-      <Modal open onOpenChange={(v) => { if (!v) onClose(); }} title="Confirm Top-up" size="sm" tone="success"
+      <CreditFormPage onBack={() => setConfirmed(false)} backLabel="Back to Top-up" onSubmit={() => { if (valid) onConfirm(amount, reference.trim()); }} title="Confirm Top-up" description="Review the credit adjustment before confirming."
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setConfirmed(false)}>Back</Button>
@@ -335,20 +330,20 @@ function TopUpModal({ tenant, onClose, onConfirm }: { tenant: TenantCredit; onCl
           </div>
           {reference && <p className="text-xs text-[#6B7280]">Ref: {reference}</p>}
         </div>
-      </Modal>
+      </CreditFormPage>
     );
   }
 
   return (
-    <Modal open onOpenChange={(v) => { if (!v) onClose(); }} title="Add Credits (Top-up)"
+    <CreditFormPage onBack={onClose} backLabel="Back to Credit Management" onSubmit={() => { if (valid) setConfirmed(true); }} title="Add Credits (Top-up)" description="Add credits to the tenant balance and record a reference for the adjustment."
       footer={
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
           <Button disabled={!valid} onClick={() => setConfirmed(true)}>Continue</Button>
         </div>
       }>
-      <div className="space-y-4">
-        <dl className="flex flex-wrap items-start justify-between gap-4 border-b border-[#E5E7EB] pb-4">
+      <div className="grid items-start gap-5 md:grid-cols-2">
+        <dl className="md:col-span-2 flex flex-wrap items-start justify-between gap-4 border-b border-[#E5E7EB] pb-4">
           <div>
             <dt className="text-xs text-[#6B7280]">Tenant</dt>
             <dd className="mt-1 text-base font-semibold text-[#111827]">{tenant.name}</dd>
@@ -362,26 +357,24 @@ function TopUpModal({ tenant, onClose, onConfirm }: { tenant: TenantCredit; onCl
         </dl>
         <FormField label="Credits to Add" required hint="Enter a positive number">
           {({ id }) => (
-            <input id={id} type="number" min={1}
-              className="w-full rounded-lg border border-[#6B7280] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1565F0]"
+            <TextInput id={id} type="number" min={1}
               value={credits} onChange={e => setCredits(e.target.value)} placeholder="e.g. 1000" />
           )}
         </FormField>
+        <FormField label="Reference / Remarks" required hint="For traceability">
+          {({ id }) => (
+            <TextInput id={id}
+              value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. REF-20261013" />
+          )}
+        </FormField>
         {amount > 0 && (
-          <div className="rounded-lg bg-green-50 px-4 py-2.5 flex items-center justify-between text-sm">
+          <div className="md:col-span-2 rounded-lg bg-green-50 px-4 py-2.5 flex items-center justify-between text-sm">
             <span className="text-green-700">Balance after top-up</span>
             <span className="font-bold text-green-800 text-base">{newBalance.toLocaleString()}</span>
           </div>
         )}
-        <FormField label="Reference / Remarks" required hint="For traceability">
-          {({ id }) => (
-            <input id={id}
-              className="w-full rounded-lg border border-[#6B7280] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1565F0]"
-              value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. REF-20261013" />
-          )}
-        </FormField>
       </div>
-    </Modal>
+    </CreditFormPage>
   );
 }
 
@@ -754,6 +747,33 @@ export default function TenantCreditPage() {
     }} />;
   }
 
+  if (isSiteAdmin && showCreate) return <TenantCreditsFormPage
+    onClose={() => setShowCreate(false)}
+    onSave={t => { setTenants(prev => [t, ...prev]); setPage(1); toast.success('Tenant created', { description: t.name + ' has been added.' }); }} />;
+  if (editTenant) return <TenantCreditsFormPage tenant={editTenant}
+    onClose={() => setEditTenant(null)}
+    onSave={updated => { setTenants(prev => prev.map(t => t.id === updated.id ? updated : t)); setEditTenant(null); toast.success('Tenant updated', { description: updated.name + ' has been saved.' }); }} />;
+
+  if (topUpTenant) return (
+        <TopUpFormPage tenant={topUpTenant} onClose={() => setTopUpTenant(null)}
+          onConfirm={(amount, reference) => {
+            if (!Number.isFinite(amount) || amount <= 0 || !reference.trim() || topUpTenant.tenantStatus !== 'active') return;
+            setTenants(previous => previous.map(tenant => {
+              if (tenant.id !== topUpTenant.id) return tenant;
+              const balance = tenant.balance + amount;
+              const planCredits = MOCK_PLANS.find(plan => tenant.plan === `${plan.name} (${plan.interval})`)?.credits ?? 0;
+              const percentage = planCredits > 0 ? balance / planCredits * 100 : Infinity;
+              const creditStatus: CreditStatus = balance < 0 ? 'negative' : balance === 0 ? 'exhausted'
+                : percentage <= (tenant.criticalThreshold ?? 10) ? 'critical'
+                : percentage <= (tenant.lowThreshold ?? 20) ? 'low' : 'active';
+              return { ...tenant, balance, creditStatus, topUpReference: reference };
+            }));
+            toast.success('Credits added', { description: `${amount.toLocaleString()} credits added to ${topUpTenant.name}.` });
+            setTopUpTenant(null);
+          }} />
+  );
+
+
   if (detailTenant) {
     return <TenantDetailView tenant={detailTenant} onBack={() => setDetailTenant(null)} />;
   }
@@ -986,38 +1006,6 @@ export default function TenantCreditPage() {
       </div>
 
       {/* Modals */}
-      {showCreate && (
-        <TenantCreditsModal
-          onClose={() => setShowCreate(false)}
-          onSave={(t) => { setTenants(prev => [t, ...prev]); toast.success('Tenant created', { description: `${t.name} has been added.` }); }}
-        />
-      )}
-      {editTenant && (
-        <TenantCreditsModal
-          tenant={editTenant}
-          onClose={() => setEditTenant(null)}
-          onSave={(updated) => { setTenants(prev => prev.map(t => t.id === updated.id ? updated : t)); setEditTenant(null); toast.success('Tenant updated', { description: `${updated.name} has been saved.` }); }}
-        />
-      )}
-      {topUpTenant && (
-        <TopUpModal tenant={topUpTenant} onClose={() => setTopUpTenant(null)}
-          onConfirm={(amount, reference) => {
-            if (!Number.isFinite(amount) || amount <= 0 || !reference.trim() || topUpTenant.tenantStatus !== 'active') return;
-            setTenants(previous => previous.map(tenant => {
-              if (tenant.id !== topUpTenant.id) return tenant;
-              const balance = tenant.balance + amount;
-              const planCredits = MOCK_PLANS.find(plan => tenant.plan === `${plan.name} (${plan.interval})`)?.credits ?? 0;
-              const percentage = planCredits > 0 ? balance / planCredits * 100 : Infinity;
-              const creditStatus: CreditStatus = balance < 0 ? 'negative' : balance === 0 ? 'exhausted'
-                : percentage <= (tenant.criticalThreshold ?? 10) ? 'critical'
-                : percentage <= (tenant.lowThreshold ?? 20) ? 'low' : 'active';
-              return { ...tenant, balance, creditStatus, topUpReference: reference };
-            }));
-            toast.success('Credits added', { description: `${amount.toLocaleString()} credits added to ${topUpTenant.name}.` });
-            setTopUpTenant(null);
-          }} />
-      )}
-
       {/* Activate / Deactivate confirmation */}
       {confirmToggleTenant && (() => {
         const isInactive = confirmToggleTenant.allocationStatus === 'inactive';

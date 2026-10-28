@@ -1,0 +1,9 @@
+.credit-form-page :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  border-color: #d1d5db;
+  box-shadow: 0 1px 2px rgb(17 24 39 / 3%);
+}
+.credit-form-page :is(input, select, textarea):hover:not(:disabled):not(:focus):not([aria-invalid="true"]) { border-color: #9ca3af; }
+.credit-form-page :is(input, select, textarea):focus { border-color: #1565f0; box-shadow: 0 0 0 3px rgb(21 101 240 / 12%); }
+.credit-form-page :is(input, select, textarea):disabled { border-color: #e5e7eb; box-shadow: none; }
+.credit-form-page :is(input, select, textarea)[aria-invalid="true"] { border-color: #dc2626; }
+.credit-form-page :is(input, select, textarea)[aria-invalid="true"]:focus { box-shadow: 0 0 0 3px rgb(220 38 38 / 12%); }

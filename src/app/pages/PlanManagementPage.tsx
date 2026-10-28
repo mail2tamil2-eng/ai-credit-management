@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { CreditFormPage } from '../components/CreditFormPage';
 import { Plus, BookOpen, Users, CheckCircle2, ArchiveX, Pencil, Trash2, Ban, Power, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -10,9 +11,8 @@ import { MOCK_PLANS } from './creditTypes';
 
 const INTERVALS: PlanInterval[] = ['Monthly', 'Yearly'];
 
-// ── Plan Create / Edit Modal ───────────────────────────────────────────────────
-function PlanModal({ open, onClose, initial, plans }: {
-  open: boolean;
+// ── Plan Create / Edit Page ───────────────────────────────────────────────────
+function PlanFormPage({ onClose, initial, plans }: {
   onClose: (saved?: Plan) => void;
   initial?: Plan;
   plans: Plan[];
@@ -46,8 +46,8 @@ function PlanModal({ open, onClose, initial, plans }: {
   }
 
   if (confirmCredits && initial) return (
-    <Modal open={open} onOpenChange={value => { if (!value) onClose(); }}
-      title="Confirm Credit Change" size="sm"
+    <CreditFormPage onBack={() => setConfirmCredits(false)} backLabel="Back to Edit Plan" onSubmit={handleSave}
+      title="Confirm Credit Change"
       footer={<div className="flex w-full items-center justify-between">
         <Button variant="secondary" onClick={() => setConfirmCredits(false)}>Back</Button>
         <Button onClick={handleSave} disabled={!valid}>Confirm Changes</Button>
@@ -61,15 +61,16 @@ function PlanModal({ open, onClose, initial, plans }: {
           <span className="font-semibold tabular-nums text-[#111827]">{initial.credits.toLocaleString()} → {creditsNum.toLocaleString()}</span>
         </div>
       </div>
-    </Modal>
+    </CreditFormPage>
   );
 
   return (
-    <Modal
-      open={open}
-      onOpenChange={(v) => { if (!v) onClose(); }}
+    <CreditFormPage
+      onBack={() => onClose()}
+      backLabel="Back to Plan Management"
+      onSubmit={handleSave}
       title={initial ? `Edit Plan — ${initial.name}` : 'Create New Plan'}
-      size="sm"
+      description="Configure the plan allocation, credits and description."
       footer={
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={() => onClose()}>Cancel</Button>
@@ -79,7 +80,7 @@ function PlanModal({ open, onClose, initial, plans }: {
         </div>
       }
     >
-      <div className="flex flex-col gap-4">
+      <div className="grid items-start gap-5 lg:grid-cols-2">
         <FormField label="Plan Name" required hint="Must be unique across all plans"
           error={duplicateName ? 'A plan with this name already exists. Enter a different name.' : undefined}>
           {({ id, describedBy, invalid }) => (
@@ -106,13 +107,13 @@ function PlanModal({ open, onClose, initial, plans }: {
         </div>
 
         {credits && creditsNum > 0 && (
-          <div className="rounded-xl bg-[#EBF3FF] px-4 py-2.5 text-sm flex items-center justify-between">
+          <div className="lg:col-span-2 rounded-xl bg-[#EBF3FF] px-4 py-2.5 text-sm flex items-center justify-between">
             <span className="text-[#6B7280]">Credits per {interval.toLowerCase()}</span>
             <span className="font-bold text-[#1565F0] text-base">{creditsNum.toLocaleString()}</span>
           </div>
         )}
 
-        <FormField label="Description">
+        <FormField label="Description" className="lg:col-span-2">
           {({ id }) => (
             <TextArea id={id} rows={2} value={description}
               onChange={e => setDescription(e.target.value)}
@@ -120,7 +121,7 @@ function PlanModal({ open, onClose, initial, plans }: {
           )}
         </FormField>
       </div>
-    </Modal>
+    </CreditFormPage>
   );
 }
 
@@ -240,6 +241,9 @@ export default function PlanManagementPage() {
     }
     setDeletePlan(null);
   }
+
+  if (createOpen) return <PlanFormPage onClose={handleCreate} plans={plans} />;
+  if (editTarget) return <PlanFormPage onClose={handleEdit} initial={editTarget} plans={plans} />;
 
   return (
     <div className="px-8 py-6 space-y-6">
@@ -393,8 +397,6 @@ export default function PlanManagementPage() {
       </div>
 
       {/* Modals */}
-      {createOpen && <PlanModal open onClose={handleCreate} plans={plans} />}
-      {editTarget && <PlanModal open onClose={handleEdit} initial={editTarget} plans={plans} />}
       {togglePlan && (
         <Modal open onOpenChange={open => { if (!open) setTogglePlan(null); }}
           title={togglePlan.status === 'active' ? 'Deactivate Plan?' : 'Activate Plan?'}
