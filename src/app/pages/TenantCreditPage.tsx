@@ -258,7 +258,7 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
             className="data-[state=checked]:bg-[#1565F0]" />
         </div>
 
-        <Checkbox label="Allow Org Admin to Deactivate Plan Credit Allocation"
+        <Checkbox label="Allow Org Admin to Deactivate Plan"
           className="[&>span:last-child]:text-[#374151] [&>span:last-child]:font-normal"
           checked={allowOrgAdminStopAllocation} onChange={setAllowOrgAdminStopAllocation} />
         </section>
