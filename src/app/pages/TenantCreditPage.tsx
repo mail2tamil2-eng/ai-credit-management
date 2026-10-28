@@ -258,7 +258,7 @@ function TenantCreditsModal({ tenant, onClose, onSave }: { tenant?: TenantCredit
             className="data-[state=checked]:bg-[#1565F0]" />
         </div>
 
-        <Checkbox label="Allow Org Admin to Stop Credit Allocation"
+        <Checkbox label="Allow Org Admin to Deactivate Plan Credit Allocation"
           className="[&>span:last-child]:text-[#374151] [&>span:last-child]:font-normal"
           checked={allowOrgAdminStopAllocation} onChange={setAllowOrgAdminStopAllocation} />
         </section>
@@ -667,7 +667,7 @@ function TenantDetailView({ tenant, onBack, onStopAllocation }: {
               <TabsTrigger value="activity" className="px-4 data-[state=active]:shadow-sm">Recent Activity</TabsTrigger>
               <TabsTrigger value="transactions" className="px-4 data-[state=active]:shadow-sm">Transaction History</TabsTrigger>
             </TabsList>
-            {historyTab === 'transactions' && (
+            {historyTab === 'activity' && (
               <Button variant="secondary" size="sm" leftIcon={<Download className="size-3.5" />}>Export CSV</Button>
             )}
             </div>

@@ -103,7 +103,7 @@ export default function CreditTransactionHistory({ tenantName, currentBalance: t
           </button>
         ))}
       </div>}
-      {(isOrgAdmin || tab === 'transactions') && (
+      {!isOrgAdmin && tab === 'transactions' && (
         <Button variant="secondary" size="sm" leftIcon={<Download className="size-3.5" />}>Export CSV</Button>
       )}
       </div>}
