@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { CreditFormPage } from '../components/CreditFormPage';
 import { toast } from 'sonner';
-import { Download, AlertTriangle, Users, Layers, Zap, Activity, ChevronDown, ChevronRight, X, Plus, Building2, Info, Pencil, Ban, Power, ArrowLeft } from 'lucide-react';
+import { Download, AlertTriangle, Users, Layers, Zap, Activity, ChevronDown, ChevronRight, X, Plus, Info, Pencil, Ban, Power, ArrowLeft } from 'lucide-react';
 import {
   Button, Checkbox, DataTable, Pagination, Modal, FormField, SearchBar,
   Tooltip, PageHeader, StatWidget, DropdownMenu, IconButton, TextInput, TextArea, SelectInput,
@@ -16,7 +16,7 @@ import { ORG_ADMIN_TENANT_ID, useRole } from '../context/RoleContext';
 
 
 // ── Assign / Edit Tenant Page ────────────────────────────────────────────────────────
-function TenantCreditsFormPage({ tenant, onClose, onSave }: { tenant?: TenantCredit; onClose: () => void; onSave: (t: TenantCredit) => void }) {
+export function TenantCreditsFormPage({ tenant, onClose, onSave }: { tenant?: TenantCredit; onClose: () => void; onSave: (t: TenantCredit) => void | Promise<void> }) {
   const currentPlan = MOCK_PLANS.find(p => tenant?.plan === `${p.name} (${p.interval})`);
   const suspended = tenant?.tenantStatus === 'suspended';
   const [name, setName] = useState(tenant?.name ?? '');
@@ -31,11 +31,20 @@ function TenantCreditsFormPage({ tenant, onClose, onSave }: { tenant?: TenantCre
   const [criticalThreshold, setCriticalThreshold] = useState(String(tenant?.criticalThreshold ?? 10));
   const [thresholdError, setThresholdError] = useState('');
   const [reviewing, setReviewing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const [saveError, setSaveError] = useState('');
+  const [topUpError, setTopUpError] = useState('');
+  const formRef = useRef<HTMLDivElement>(null);
 
   const activePlans = MOCK_PLANS.filter(p => p.status === 'active' || p.id === currentPlan?.id);
   const selectedPlan = activePlans.find(p => p.id === planId) ?? null;
   const planCredits = selectedPlan?.credits ?? 0;
-  const extraCredits = Number(topUp) || 0;
+  const extraCredits = Number(topUp);
+  const validTopUp = Number.isFinite(extraCredits) && extraCredits >= 0;
+  // Preserve the existing demo schedule; display and payload share one value.
+  const nextAllocation = tenant && planId === (currentPlan?.id ?? '') ? tenant.nextAllocation
+    : selectedPlan ? (selectedPlan.interval === 'Monthly' ? '01 Nov 2026' : '01 Oct 2027') : undefined;
   const planChanged = planId !== (currentPlan?.id ?? '');
   const creditsAdded = tenant ? (planChanged ? Math.max(0, planCredits - (currentPlan?.credits ?? 0)) : 0) : planCredits;
   const openingBalance = (tenant?.balance ?? 0) + creditsAdded + extraCredits;
@@ -58,12 +67,12 @@ function TenantCreditsFormPage({ tenant, onClose, onSave }: { tenant?: TenantCre
       <div className="flex items-center justify-between border-t border-[#E5E7EB] pt-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wide text-[#9CA3AF]">Credits added now</p>
-          <p className="text-base font-bold tabular-nums text-green-700">+{(creditsAdded + extraCredits).toLocaleString()}</p>
+          <p className="text-base font-bold tabular-nums text-green-700">+{validTopUp && !topUpError ? (creditsAdded + extraCredits).toLocaleString() : '?'}</p>
         </div>
         <div className="h-8 w-px bg-[#E5E7EB]" />
         <div className="text-right">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-[#9CA3AF]">Balance after</p>
-          <p className="text-base font-bold tabular-nums text-[#1565F0]">{openingBalance.toLocaleString()}</p>
+          <p className="text-base font-bold tabular-nums text-[#1565F0]">{validTopUp && !topUpError && Number.isFinite(openingBalance) ? openingBalance.toLocaleString() : '?'}</p>
         </div>
       </div>
       {extraCredits > 0 && <p className="text-xs text-[#6B7280]">Includes {extraCredits.toLocaleString()} top-up credits.</p>}
@@ -82,24 +91,28 @@ function TenantCreditsFormPage({ tenant, onClose, onSave }: { tenant?: TenantCre
     return 'active';
   }
 
-  function handleSave() {
-    if (suspended) return;
+  async function handleSave() {
+    if (suspended || savingRef.current) return;
+    setSaveError('');
     let valid = true;
     if (!name.trim()) { setNameError('Tenant name is required'); valid = false; }
     if (extraCredits > 0 && !reference.trim()) { setRefError('Reference is required for top-up'); valid = false; }
     const lowVal = Number(lowThreshold);
     const critVal = Number(criticalThreshold);
     if (!Number.isFinite(lowVal) || !Number.isFinite(critVal) || lowVal <= 0 || lowVal >= 100 || critVal <= 0 || critVal >= lowVal) {
-      setThresholdError('Critical threshold must be less than Low threshold');
+      setThresholdError('Enter percentages greater than 0 and less than 100. Critical must be lower than Low.');
       valid = false;
     } else {
       setThresholdError('');
     }
-    if (!Number.isFinite(Number(topUp)) || Number(topUp) < 0) {
-      toast.error('Enter a valid, non-negative top-up amount.');
+    if (!validTopUp || topUpError || !Number.isFinite(openingBalance)) {
+      setTopUpError('Enter a valid, non-negative top-up amount.');
       valid = false;
     }
-    if (!valid) return;
+    if (!valid) {
+      requestAnimationFrame(() => formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
+      return;
+    }
     if (tenant && !reviewing) { setReviewing(true); return; }
     const updatedTenant: TenantCredit = {
       ...tenant,
@@ -107,9 +120,7 @@ function TenantCreditsFormPage({ tenant, onClose, onSave }: { tenant?: TenantCre
       name: name.trim(),
       tenantStatus: tenant?.tenantStatus ?? 'active',
       plan: selectedPlan ? `${selectedPlan.name} (${selectedPlan.interval})` : undefined,
-      nextAllocation: tenant && !planChanged ? tenant.nextAllocation : suspended ? 'Paused' : selectedPlan
-        ? (selectedPlan.interval === 'Monthly' ? '01 Nov 2026' : '01 Oct 2027')
-        : undefined,
+      nextAllocation: suspended ? 'Paused' : nextAllocation,
       balance: openingBalance,
       creditStatus: deriveCreditStatus(openingBalance, planCredits, lowVal / 100, critVal / 100),
       allocationStatus: tenant && !planChanged ? tenant.allocationStatus : selectedPlan ? 'active' : 'inactive',
@@ -119,8 +130,17 @@ function TenantCreditsFormPage({ tenant, onClose, onSave }: { tenant?: TenantCre
       criticalThreshold: critVal,
       topUpReference: extraCredits > 0 ? reference.trim() : tenant?.topUpReference,
     };
-    onSave(updatedTenant);
-    onClose();
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      await onSave(updatedTenant);
+      onClose();
+    } catch {
+      setSaveError('Unable to save tenant credits. Your entries are preserved. Please try again.');
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
   }
 
   const planOptions = [
@@ -129,12 +149,13 @@ function TenantCreditsFormPage({ tenant, onClose, onSave }: { tenant?: TenantCre
   ];
 
   if (reviewing && tenant) return (
-    <CreditFormPage onBack={() => setReviewing(false)} backLabel="Back to Edit Tenant Credits" onSubmit={handleSave} title="Confirm Plan Change"
-      footer={<div className="flex w-full items-center justify-between">
-        <Button variant="secondary" onClick={() => setReviewing(false)}>Back</Button>
-        <Button onClick={handleSave}>Confirm</Button>
+    <CreditFormPage busy={saving} noValidate onBack={() => setReviewing(false)} backLabel="Back to Edit Tenant Credits" onSubmit={handleSave} title="Confirm Plan Change"
+      footer={<div className="flex w-full flex-wrap items-center justify-between gap-3">
+        <Button disabled={saving} variant="secondary" onClick={() => setReviewing(false)}>Back</Button>
+        <Button loading={saving} loadingText="Saving�" type="submit">Confirm</Button>
       </div>}>
       <div className="space-y-4">
+        {saveError && <p role="alert" className="text-sm text-red-700">{saveError}</p>}
         <p className="text-sm text-[#374151]">Confirm the following changes for <strong>{tenant.name}</strong>?</p>
         <div className="space-y-2 rounded-lg border border-[#E5E7EB] p-3">
           <Row label="Current Plan" value={tenant.plan ?? 'No plan assigned'} />
@@ -152,23 +173,25 @@ function TenantCreditsFormPage({ tenant, onClose, onSave }: { tenant?: TenantCre
   );
 
   return (
-    <CreditFormPage
+    <CreditFormPage busy={saving} noValidate
       onBack={onClose}
       backLabel="Back to Credit Management"
       onSubmit={handleSave}
       title={tenant ? "Edit Tenant Credits — " + tenant.name : "Assign Tenant Credits"}
-      description={tenant ? "Update tenant details, plan and credit settings." : "Set up a new tenant with a plan and opening credit balance."}
+      description={tenant ? "Update tenant details, plan and credit settings." : "Choose a tenant, allocate credits and configure credit alerts."}
       footer={
         <div className="flex w-full items-center justify-between">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button leftIcon={tenant ? undefined : <Building2 className="size-4" />} onClick={handleSave}>{tenant ? "Review & Confirm" : "Assign Tenant"}</Button>
+          <Button disabled={saving} variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button type="submit" loading={saving} loadingText="Saving�" disabled={suspended}>{tenant ? "Review & Confirm" : "Assign Tenant"}</Button>
         </div>
       }
     >
-      <div className="grid items-start gap-6 xl:grid-cols-2">
+      <div ref={formRef} className="tenant-allocation-form">
+      {saveError && <p role="alert" className="mb-4 text-sm text-red-700">{saveError}</p>}
+      <div className="allocation-columns grid items-start gap-6">
         <section aria-labelledby="tenant-plan-heading" className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 id="tenant-plan-heading" className="text-sm font-semibold text-[#111827]">Plan and credits</h3>
+            <h3 id="tenant-plan-heading" className="text-sm font-semibold text-[#111827]">Tenant and allocation</h3>
             {tenant && (
               <span className="inline-flex flex-wrap items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs">
                 <span className="text-[#6B7280]">Current plan:</span>
@@ -178,8 +201,9 @@ function TenantCreditsFormPage({ tenant, onClose, onSave }: { tenant?: TenantCre
           </div>
         {/* Tenant name */}
         {!tenant && <FormField label="Tenant Name" required error={nameError}>
-          {({ id }) => (
+          {({ id, describedBy, invalid }) => (
             <SelectInput
+              aria-required="true" aria-describedby={describedBy} invalid={invalid}
               id={id}
               value={name}
               options={[
@@ -200,10 +224,10 @@ function TenantCreditsFormPage({ tenant, onClose, onSave }: { tenant?: TenantCre
               onChange={e => setPlanId(e.target.value)} />
           )}
         </FormField>
-        {<FormField label="Top-up Credits" hint="Optional — added immediately on top of plan allocation.">
-          {({ id }) => (
-            <TextInput id={id} type="number" min={0} disabled={suspended} placeholder="e.g. 500"
-              value={topUp} onChange={e => { setTopUp(e.target.value); if (!e.target.value) setRefError(''); }} />
+        {<FormField label="Top-up Credits" error={topUpError} hint="Optional. Added to the plan allocation immediately.">
+          {({ id, describedBy, invalid }) => (
+            <TextInput id={id} aria-describedby={describedBy} invalid={invalid} type="number" step="any" min={0} disabled={suspended} placeholder="e.g. 500"
+              value={topUp} onChange={e => { setTopUp(e.target.value); setTopUpError(e.target.validity.badInput || !Number.isFinite(Number(e.target.value)) || Number(e.target.value) < 0 ? 'Enter a valid, non-negative top-up amount.' : ''); if (!e.target.value) setRefError(''); }} />
           )}
         </FormField>}
         </div>
@@ -212,7 +236,7 @@ function TenantCreditsFormPage({ tenant, onClose, onSave }: { tenant?: TenantCre
         {extraCredits > 0 && (
           <FormField label="Reference" required error={refError}>
             {({ id, describedBy, invalid }) => (
-              <TextInput id={id} aria-describedby={describedBy} invalid={invalid}
+              <TextInput id={id} aria-required="true" aria-describedby={describedBy} invalid={invalid}
                 placeholder="e.g. REF-20261022"
                 value={reference} onChange={e => { setReference(e.target.value); if (e.target.value) setRefError(''); }} />
             )}
@@ -225,26 +249,29 @@ function TenantCreditsFormPage({ tenant, onClose, onSave }: { tenant?: TenantCre
           <div className="flex items-center gap-2 rounded-lg bg-[#EBF3FF] px-3 py-2 text-xs text-[#1254C7]">
             <Info className="size-3.5 shrink-0" />
             <span>
-              Effective upon saving. Next allocation: {selectedPlan.interval === 'Monthly' ? '01 Nov 2026' : '01 Oct 2027'}.
+              Effective upon saving. Next allocation: {nextAllocation}.
             </span>
           </div>
         )}
 
 
         {/* Opening balance summary */}
-        {!tenant && <div className="flex items-center justify-between rounded-lg bg-[#F9FAFB] border border-[#E5E7EB] px-4 py-3">
-          <span className="text-[13px] font-semibold text-[#374151]">{tenant ? "Balance after saving" : "Opening balance"}</span>
-          <span className="text-base font-bold text-[#1565F0] tabular-nums">
-            {openingBalance.toLocaleString()} <span className="text-xs font-semibold text-[#6B7280]">credits</span>
-          </span>
-        </div>}
+        {!tenant && <section aria-labelledby="opening-balance-title" className="rounded-lg bg-[#F9FAFB] border border-[#E5E7EB] px-4 py-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h3 id="opening-balance-title" className="text-sm font-semibold text-[#374151]">Opening balance</h3>
+            <output aria-live="polite" aria-atomic="true" className="text-2xl font-bold text-[#111827] tabular-nums">
+              {validTopUp && !topUpError && Number.isFinite(openingBalance) ? openingBalance.toLocaleString() : '�'} <span className="text-sm font-normal text-[#6B7280]">credits</span>
+            </output>
+          </div>
+          <p className="mt-2 text-xs text-[#6B7280]">{planCredits.toLocaleString()} plan credits + {validTopUp && !topUpError ? extraCredits.toLocaleString() : '�'} top-up credits</p>
+        </section>}
 
         </section>
         <div className="space-y-5 rounded-xl border border-[#E5E7EB] bg-[#FAFBFC] p-5">
         <section aria-labelledby="tenant-allocation-heading" className="space-y-4">
           <h3 id="tenant-allocation-heading" className="text-sm font-semibold text-[#111827]">Allocation settings</h3>
         {/* Rollover */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <label htmlFor="rollover-switch" className="text-[13px] font-semibold text-[#374151] cursor-pointer">
             Rollover unused credits
           </label>
@@ -265,9 +292,9 @@ function TenantCreditsFormPage({ tenant, onClose, onSave }: { tenant?: TenantCre
               {({ id }) => (
                 <div className="relative">
                   <TextInput
-                    id={id} type="number" min={1} max={99}
+                    id={id} type="number" step="any" invalid={!!thresholdError}
                     value={lowThreshold}
-                    aria-describedby="credit-threshold-help"
+                    aria-describedby={thresholdError ? "credit-threshold-help credit-threshold-error" : "credit-threshold-help"}
                     onChange={e => { setLowThreshold(e.target.value); setThresholdError(''); }}
                     style={{ paddingRight: '2rem' }}
                   />
@@ -279,9 +306,9 @@ function TenantCreditsFormPage({ tenant, onClose, onSave }: { tenant?: TenantCre
               {({ id }) => (
                 <div className="relative">
                   <TextInput
-                    id={id} type="number" min={1} max={99}
+                    id={id} type="number" step="any" invalid={!!thresholdError}
                     value={criticalThreshold}
-                    aria-describedby="credit-threshold-help"
+                    aria-describedby={thresholdError ? "credit-threshold-help credit-threshold-error" : "credit-threshold-help"}
                     onChange={e => { setCriticalThreshold(e.target.value); setThresholdError(''); }}
                     style={{ paddingRight: '2rem' }}
                   />
@@ -293,10 +320,11 @@ function TenantCreditsFormPage({ tenant, onClose, onSave }: { tenant?: TenantCre
           <p id="credit-threshold-help" className="mt-2 text-xs leading-relaxed text-[#6B7280]">
             Alerts notify the Credit Manager and Org Admin when credits reach the configured thresholds.
           </p>
-          {thresholdError && <p className="mt-1.5 text-xs text-red-600">{thresholdError}</p>}
+          {thresholdError && <p id="credit-threshold-error" role="alert" className="mt-1.5 text-xs text-red-600">{thresholdError}</p>}
         </div>
         </section>
         </div>
+      </div>
       </div>
     </CreditFormPage>
   );

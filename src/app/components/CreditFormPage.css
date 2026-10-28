@@ -7,3 +7,24 @@
 .credit-form-page :is(input, select, textarea):disabled { border-color: #e5e7eb; box-shadow: none; }
 .credit-form-page :is(input, select, textarea)[aria-invalid="true"] { border-color: #dc2626; }
 .credit-form-page :is(input, select, textarea)[aria-invalid="true"]:focus { box-shadow: 0 0 0 3px rgb(220 38 38 / 12%); }
+
+/* Assignment layout responds to available content width, including the sidebar. */
+.credit-form-page:has(.tenant-allocation-form) { container-type: inline-size; }
+.tenant-allocation-form { min-width: 0; }
+.tenant-allocation-form :is(input:not([type="checkbox"]), select) { min-width: 0; width: 100%; border-bottom-color: #6B7280; }
+.tenant-allocation-form section { min-width: 0; }
+@container (min-width: 850px) {
+  .allocation-columns { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+}
+@container (max-width: 550px) {
+  .tenant-allocation-form .grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Keep the focused allocation workflow usable within the desktop app shell. */
+@media (max-width: 767px) {
+  body:has(.tenant-allocation-form) #root > div > .fixed.left-0 { display: none; }
+  body:has(.tenant-allocation-form) main { margin-left: 0 !important; }
+  body:has(.tenant-allocation-form) .fixed.top-0.right-0 { left: 0 !important; }
+  body:has(.tenant-allocation-form) .fixed.top-0.right-0 header > div:first-child { display: none; }
+  body:has(.tenant-allocation-form) .fixed.top-0.right-0 header button > span.text-left { display: none; }
+}
