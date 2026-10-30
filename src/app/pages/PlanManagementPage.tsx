@@ -21,7 +21,7 @@ function PlanFormPage({ onClose, initial, plans }: {
   const [interval, setInterval] = useState<PlanInterval>(initial?.interval ?? 'Monthly');
   const [credits, setCredits] = useState(String(initial?.credits ?? ''));
   const [description, setDescription] = useState(initial?.description ?? '');
-  const [confirmCredits, setConfirmCredits] = useState(false);
+  const [confirmPlan, setConfirmPlan] = useState(false);
   const creditsNum = Number(credits);
   const normalizeName = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
   const duplicateName = !!name.trim() && plans.some(plan =>
@@ -30,8 +30,8 @@ function PlanFormPage({ onClose, initial, plans }: {
 
   function handleSave() {
     if (!valid) return;
-    if (initial && creditsNum !== initial.credits && !confirmCredits) {
-      setConfirmCredits(true);
+    if ((!initial || creditsNum !== initial.credits) && !confirmPlan) {
+      setConfirmPlan(true);
       return;
     }
     onClose({
@@ -45,14 +45,15 @@ function PlanFormPage({ onClose, initial, plans }: {
     });
   }
 
-  const confirmation = initial && (
-    <Modal open={confirmCredits} onOpenChange={setConfirmCredits} size="md" tone="warning"
-      title="Confirm Credit Change"
+  const confirmation = (
+    <Modal open={confirmPlan} onOpenChange={setConfirmPlan} size="md" tone={initial ? "warning" : "info"}
+      title={initial ? "Confirm Credit Change" : "Confirm New Plan"}
       footer={<div className="flex w-full items-center justify-between">
-        <Button variant="secondary" onClick={() => setConfirmCredits(false)}>Cancel</Button>
-        <Button onClick={handleSave} disabled={!valid}>Confirm Changes</Button>
+        <Button variant="secondary" onClick={() => setConfirmPlan(false)}>Cancel</Button>
+        <Button onClick={handleSave} disabled={!valid}>{initial ? "Confirm Changes" : "Create Plan"}</Button>
       </div>}>
       <div className="space-y-4">
+        {initial ? <>
         <p className="text-sm text-[#374151]">
           This plan is used by <strong>{initial.assignedTenants} tenants</strong>. The change applies from their next allocation.
         </p>
@@ -60,6 +61,15 @@ function PlanFormPage({ onClose, initial, plans }: {
           <span className="font-medium text-[#374151]">Credits</span>
           <span className="font-semibold tabular-nums text-[#111827]">{initial.credits.toLocaleString()} → {creditsNum.toLocaleString()}</span>
         </div>
+        </> : <>
+          <p className="text-sm text-[#374151]">Review the details before creating this plan.</p>
+          <dl className="space-y-3 rounded-lg bg-[#F9FAFB] p-4 text-sm">
+            <div className="flex justify-between gap-4"><dt>Plan Name</dt><dd className="font-semibold text-right break-words min-w-0">{name.trim()}</dd></div>
+            <div className="flex justify-between gap-4"><dt>Allocation</dt><dd className="font-semibold">{interval}</dd></div>
+            <div className="flex justify-between gap-4"><dt>Credits</dt><dd className="font-semibold tabular-nums">{creditsNum.toLocaleString()}</dd></div>
+            {description.trim() && <div className="space-y-1"><dt>Description</dt><dd className="whitespace-pre-wrap break-words font-medium">{description.trim()}</dd></div>}
+          </dl>
+        </>}
       </div>
     </Modal>
   );
