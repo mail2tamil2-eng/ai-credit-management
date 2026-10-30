@@ -45,11 +45,11 @@ function PlanFormPage({ onClose, initial, plans }: {
     });
   }
 
-  if (confirmCredits && initial) return (
-    <CreditFormPage onBack={() => setConfirmCredits(false)} backLabel="Back to Edit Plan" onSubmit={handleSave}
+  const confirmation = initial && (
+    <Modal open={confirmCredits} onOpenChange={setConfirmCredits} size="md" tone="warning"
       title="Confirm Credit Change"
       footer={<div className="flex w-full items-center justify-between">
-        <Button variant="secondary" onClick={() => setConfirmCredits(false)}>Back</Button>
+        <Button variant="secondary" onClick={() => setConfirmCredits(false)}>Cancel</Button>
         <Button onClick={handleSave} disabled={!valid}>Confirm Changes</Button>
       </div>}>
       <div className="space-y-4">
@@ -61,10 +61,11 @@ function PlanFormPage({ onClose, initial, plans }: {
           <span className="font-semibold tabular-nums text-[#111827]">{initial.credits.toLocaleString()} → {creditsNum.toLocaleString()}</span>
         </div>
       </div>
-    </CreditFormPage>
+    </Modal>
   );
 
   return (
+    <>
     <CreditFormPage
       onBack={() => onClose()}
       backLabel="Back to Plan Management"
@@ -122,6 +123,8 @@ function PlanFormPage({ onClose, initial, plans }: {
         </FormField>
       </div>
     </CreditFormPage>
+    {confirmation}
+    </>
   );
 }
 

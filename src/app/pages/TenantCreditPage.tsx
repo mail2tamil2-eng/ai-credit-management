@@ -148,11 +148,11 @@ export function TenantCreditsFormPage({ tenant, onClose, onSave }: { tenant?: Te
     ...activePlans.map(p => ({ value: p.id, label: `${p.name} (${p.interval}) — ${p.credits.toLocaleString()} credits` })),
   ];
 
-  if (reviewing && tenant) return (
-    <CreditFormPage busy={saving} noValidate onBack={() => setReviewing(false)} backLabel="Back to Edit Tenant Credits" onSubmit={handleSave} title="Confirm Plan Change"
+  const confirmation = tenant && (
+    <Modal open={reviewing} onOpenChange={open => { if (!savingRef.current) setReviewing(open); }} hideClose={saving} size="md" title="Confirm Plan Change"
       footer={<div className="flex w-full flex-wrap items-center justify-between gap-3">
-        <Button disabled={saving} variant="secondary" onClick={() => setReviewing(false)}>Back</Button>
-        <Button loading={saving} loadingText="Saving�" type="submit">Confirm</Button>
+        <Button disabled={saving} variant="secondary" onClick={() => setReviewing(false)}>Cancel</Button>
+        <Button loading={saving} loadingText="Saving�" onClick={handleSave}>Confirm</Button>
       </div>}>
       <div className="space-y-4">
         {saveError && <p role="alert" className="text-sm text-red-700">{saveError}</p>}
@@ -169,10 +169,11 @@ export function TenantCreditsFormPage({ tenant, onClose, onSave }: { tenant?: Te
           {extraCredits > 0 && <Row label="Reference" value={reference} />}
         </div>
       </div>
-    </CreditFormPage>
+    </Modal>
   );
 
   return (
+    <>
     <CreditFormPage busy={saving} noValidate
       onBack={onClose}
       backLabel="Back to Credit Management"
@@ -330,6 +331,8 @@ export function TenantCreditsFormPage({ tenant, onClose, onSave }: { tenant?: Te
       </div>
       </div>
     </CreditFormPage>
+    {confirmation}
+    </>
   );
 }
 
@@ -342,12 +345,11 @@ function TopUpFormPage({ tenant, onClose, onConfirm }: { tenant: TenantCredit; o
   const newBalance = tenant.balance + amount;
   const valid = Number.isFinite(amount) && amount > 0 && Number.isFinite(newBalance) && !!reference.trim();
 
-  if (confirmed && amount > 0) {
-    return (
-      <CreditFormPage onBack={() => setConfirmed(false)} backLabel="Back to Top-up" onSubmit={() => { if (valid) onConfirm(amount, reference.trim()); }} title="Confirm Top-up" description="Review the credit adjustment before confirming."
+  const confirmation = (
+      <Modal open={confirmed} onOpenChange={setConfirmed} size="md" title="Confirm Top-up" description="Review the credit adjustment before confirming."
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setConfirmed(false)}>Back</Button>
+            <Button variant="secondary" onClick={() => setConfirmed(false)}>Cancel</Button>
             <Button disabled={!valid} onClick={() => { if (valid) onConfirm(amount, reference.trim()); }}>Add Credits</Button>
           </div>
         }>
@@ -361,11 +363,11 @@ function TopUpFormPage({ tenant, onClose, onConfirm }: { tenant: TenantCredit; o
           </div>
           {reference && <p className="text-xs text-[#6B7280]">Ref: {reference}</p>}
         </div>
-      </CreditFormPage>
-    );
-  }
+      </Modal>
+  );
 
   return (
+    <>
     <CreditFormPage onBack={onClose} backLabel="Back to Credit Management" onSubmit={() => { if (valid) setConfirmed(true); }} title="Add Credits (Top-up)" description="Add credits to the tenant balance and record a reference for the adjustment."
       footer={
         <div className="flex justify-end gap-2">
@@ -406,6 +408,8 @@ function TopUpFormPage({ tenant, onClose, onConfirm }: { tenant: TenantCredit; o
         )}
       </div>
     </CreditFormPage>
+    {confirmation}
+    </>
   );
 }
 
